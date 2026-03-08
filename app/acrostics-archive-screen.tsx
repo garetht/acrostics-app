@@ -93,8 +93,14 @@ export function AcrosticsArchiveScreen({
       ]),
     ) as Record<string, number>;
 
-    setFilledCountByDate(nextFilledCountByDate);
-    setHasHydratedProgress(true);
+    const hydrateFrame = window.requestAnimationFrame(() => {
+      setFilledCountByDate(nextFilledCountByDate);
+      setHasHydratedProgress(true);
+    });
+
+    return () => {
+      window.cancelAnimationFrame(hydrateFrame);
+    };
   }, [availableDates]);
 
   return (
