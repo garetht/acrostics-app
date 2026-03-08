@@ -1,16 +1,17 @@
-import { appendFile, mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 
 import {
   buildAcrosticDataUrl,
   createAcrosticCacheRecord,
+  decodeAcrosticCache,
   decodeAcrosticCacheRecord,
+  encodeAcrosticCache,
   extractAvailableAcrosticDates,
   filterInclusiveDateRange,
   getTodayInTimeZone,
   normalizeInputDate,
-  parseAcrosticCacheFile,
   parseWrappedPuzzleResponse,
   toSavedAcrosticPuzzle,
   type AcrosticCacheRecord,
@@ -22,7 +23,6 @@ import {
 } from "../lib/xwordinfo/acrostics.mts";
 
 const DEFAULT_OUTPUT_DIR = "data/xwordinfo/acrostics";
-const DEFAULT_CACHE_FILE = "data/xwordinfo/acrostics.ndjson";
 
 type CliOutputOptions = {
   outDir?: string;
@@ -172,7 +172,7 @@ export async function runFetchAcrostics(
   for (const date of uncachedDates) {
     try {
       const puzzle = await fetchPuzzle(date, fetchImpl);
-      await writeFetchedOutputs(date, puzzle, outputs);
+      await writeFetchedOutputs(date, puzzle, outputs, cacheState);
       logger.log(describeFetchedWrite(date, outputs));
     } catch (error) {
       const message = getErrorMessage(error);
@@ -229,7 +229,7 @@ async function runSingleDateMode(
   }
 
   const puzzle = await fetchPuzzle(options.date, fetchImpl);
-  await writeFetchedOutputs(options.date, puzzle, outputs);
+  await writeFetchedOutputs(options.date, puzzle, outputs, cacheState);
   logger.log(describeFetchedWrite(options.date, outputs));
 
   return 0;
@@ -248,6 +248,7 @@ async function writeFetchedOutputs(
   date: string,
   puzzle: XWordInfoPuzzle,
   outputs: ResolvedOutputTargets,
+  cacheState: CacheState,
 ): Promise<void> {
   const savedPuzzle = toSavedAcrosticPuzzle(puzzle);
 
@@ -256,7 +257,8 @@ async function writeFetchedOutputs(
   }
 
   if (outputs.cacheFile) {
-    await appendCacheRecord(outputs.cacheFile, createAcrosticCacheRecord(date, puzzle));
+    addCacheRecord(cacheState, createAcrosticCacheRecord(date, puzzle));
+    await writeCacheFile(outputs.cacheFile, cacheState.records);
   }
 }
 
@@ -270,19 +272,19 @@ async function writePuzzleFile(
   await writeFile(filePath, `${JSON.stringify(puzzle, null, 2)}\n`, "utf8");
 }
 
-async function appendCacheRecord(
+async function writeCacheFile(
   cacheFile: string,
-  record: AcrosticCacheRecord,
+  records: readonly AcrosticCacheRecord[],
 ): Promise<void> {
   await mkdir(path.dirname(cacheFile), { recursive: true });
-  await appendFile(cacheFile, `${JSON.stringify(record)}\n`, "utf8");
+  await writeFile(cacheFile, encodeAcrosticCache(records));
 }
 
 async function loadCacheState(cacheFile: string): Promise<CacheState> {
-  let text: string;
+  let compressedData: Uint8Array;
 
   try {
-    text = await readFile(cacheFile, "utf8");
+    compressedData = await readFile(cacheFile);
   } catch (error) {
     if (isFileNotFoundError(error)) {
       return createEmptyCacheState();
@@ -291,7 +293,7 @@ async function loadCacheState(cacheFile: string): Promise<CacheState> {
     throw error;
   }
 
-  const records = parseAcrosticCacheFile(text);
+  const records = decodeAcrosticCache(compressedData);
   const recordsByDate = new Map(records.map((record) => [record.date, record]));
 
   return {
@@ -306,6 +308,25 @@ function createEmptyCacheState(): CacheState {
     records: [],
     recordsByDate: new Map(),
   };
+}
+
+function addCacheRecord(
+  cacheState: CacheState,
+  record: AcrosticCacheRecord,
+): void {
+  if (cacheState.recordsByDate.has(record.date)) {
+    throw new Error(`Cache already contains ${record.date}.`);
+  }
+
+  if (cacheState.lastDate && record.date <= cacheState.lastDate) {
+    throw new Error(
+      `Cannot append ${record.date}: cache already ends at ${cacheState.lastDate}.`,
+    );
+  }
+
+  cacheState.records.push(record);
+  cacheState.recordsByDate.set(record.date, record);
+  cacheState.lastDate = record.date;
 }
 
 async function fetchText(url: string, fetchImpl: FetchLike): Promise<string> {
@@ -350,9 +371,7 @@ function normalizeCliOutputOptions(
 function resolveOutputTargets(options: CliOutputOptions): ResolvedOutputTargets {
   return {
     outDir: options.outDir ? path.resolve(options.outDir) : undefined,
-    cacheFile: options.cacheFile
-      ? path.resolve(options.cacheFile)
-      : undefined,
+    cacheFile: options.cacheFile ? path.resolve(options.cacheFile) : undefined,
   };
 }
 

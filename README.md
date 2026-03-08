@@ -36,13 +36,15 @@ With no arguments, the CLI fetches every published acrostic date in the archive 
 npm run fetch:acrostics:cache
 ```
 
-This writes newline-delimited JSON records to `data/xwordinfo/acrostics.ndjson` in the repository:
+This writes a gzipped JSON cache to `data/xwordinfo/acrostics.json.gz` in the repository. The uncompressed JSON is an array of records shaped like:
 
 ```json
-{"date":"2026-03-08","acrostic":"<base64 gzipped decoded puzzle json>"}
+[
+  {"date":"2026-03-08","acrostic":"<base64 gzipped decoded puzzle json>"}
+]
 ```
 
-The cache file is append-only and date-ordered. When it already contains data, the fetcher reads the last line and only requests dates after that cached date.
+When the cache file already contains data, the fetcher gunzips it, parses the JSON array, reads the last cached date, and only requests dates after that point before rewriting the gzipped file.
 
 ### Fetch a Single Date
 
@@ -68,7 +70,7 @@ Range mode does not walk every calendar day. It first loads the XWord Info acros
 Write only the committed cache file:
 
 ```bash
-npm run fetch:acrostics -- --cache-file data/xwordinfo/acrostics.ndjson
+npm run fetch:acrostics -- --cache-file data/xwordinfo/acrostics.json.gz
 ```
 
 Write only per-date JSON files to a custom directory:
@@ -80,7 +82,7 @@ npm run fetch:acrostics -- --out-dir tmp/acrostics
 Write both outputs in the same run:
 
 ```bash
-npm run fetch:acrostics -- --since 2026-01-01 --out-dir tmp/acrostics --cache-file data/xwordinfo/acrostics.ndjson
+npm run fetch:acrostics -- --since 2026-01-01 --out-dir tmp/acrostics --cache-file data/xwordinfo/acrostics.json.gz
 ```
 
 If `--cache-file` is supplied for `--date`, the CLI first checks the committed cache file for that date. A cache hit can materialize the per-date JSON file without making a network request.
@@ -101,7 +103,7 @@ The fetcher:
 2. Base64-decodes `data`.
 3. Gunzips the payload.
 4. Parses the decoded JSON into typed models.
-5. Validates the required fields before writing the file or cache record.
+5. Validates the required fields before writing the file or gzipped cache.
 
 The typed models and parsing helpers live in [`lib/xwordinfo/acrostics.mts`](./lib/xwordinfo/acrostics.mts).
 
@@ -114,7 +116,7 @@ The typed models and parsing helpers live in [`lib/xwordinfo/acrostics.mts`](./l
 - Range mode fetches dates sequentially.
 - If one date fails in range mode, later dates still run.
 - Range mode exits non-zero if any dates fail and prints a failure summary.
-- Cache-file mode assumes records are sorted by ascending date with exactly one line per date.
+- Cache-file mode assumes the decoded cache array is sorted by ascending date.
 
 ## Testing
 

@@ -110,54 +110,62 @@ export function createAcrosticCacheRecord(
 
 export function parseAcrosticCacheRecord(jsonText: string): AcrosticCacheRecord {
   const record = parseJsonRecord(jsonText, "acrostic cache record");
-  const date = normalizeCacheRecordDate(record);
-  const acrostic = readNonEmptyString(
-    record,
-    "acrostic",
-    "acrostic cache record",
-  ).trim();
+  return readAcrosticCacheRecord(record, "acrostic cache record");
+}
 
-  if (!BASE64_PATTERN.test(acrostic)) {
+export function parseAcrosticCache(jsonText: string): AcrosticCacheRecord[] {
+  let parsed: unknown;
+
+  try {
+    parsed = JSON.parse(jsonText);
+  } catch (error) {
+    throw new Error(`Invalid acrostic cache: ${getErrorMessage(error)}`);
+  }
+
+  if (!Array.isArray(parsed)) {
+    throw new Error("Invalid acrostic cache: expected a JSON array.");
+  }
+
+  const records = parsed.map((entry, index) => {
+    if (!entry || typeof entry !== "object" || Array.isArray(entry)) {
+      throw new Error(
+        `Invalid acrostic cache entry ${index + 1}: expected a JSON object.`,
+      );
+    }
+
+    return readAcrosticCacheRecord(
+      entry as Record<string, unknown>,
+      `acrostic cache entry ${index + 1}`,
+    );
+  });
+
+  validateAcrosticCacheRecords(records);
+  return records;
+}
+
+export function encodeAcrosticCache(records: readonly AcrosticCacheRecord[]): Buffer {
+  validateAcrosticCacheRecords(records);
+  return gzipSync(Buffer.from(JSON.stringify(records), "utf8"));
+}
+
+export function decodeAcrosticCache(
+  compressedData: Uint8Array,
+): AcrosticCacheRecord[] {
+  if (compressedData.byteLength === 0) {
+    return [];
+  }
+
+  let decodedJson: string;
+
+  try {
+    decodedJson = gunzipSync(compressedData).toString("utf8");
+  } catch (error) {
     throw new Error(
-      "Invalid acrostic cache record: expected `acrostic` to be valid base64.",
+      `Unable to decode acrostic cache file: ${getErrorMessage(error)}`,
     );
   }
 
-  return { date, acrostic };
-}
-
-export function parseAcrosticCacheFile(text: string): AcrosticCacheRecord[] {
-  const records: AcrosticCacheRecord[] = [];
-  let previousDate: string | undefined;
-
-  for (const [index, rawLine] of text.split(/\r?\n/).entries()) {
-    const line = rawLine.trim();
-
-    if (line === "") {
-      continue;
-    }
-
-    let record: AcrosticCacheRecord;
-
-    try {
-      record = parseAcrosticCacheRecord(line);
-    } catch (error) {
-      throw new Error(
-        `Invalid acrostic cache file line ${index + 1}: ${getErrorMessage(error)}`,
-      );
-    }
-
-    if (previousDate && record.date <= previousDate) {
-      throw new Error(
-        `Invalid acrostic cache file line ${index + 1}: dates must be strictly increasing.`,
-      );
-    }
-
-    records.push(record);
-    previousDate = record.date;
-  }
-
-  return records;
+  return parseAcrosticCache(decodedJson);
 }
 
 export function decodeAcrosticCacheRecord(record: AcrosticCacheRecord): {
@@ -299,21 +307,50 @@ function readSavedPuzzleFields(
   };
 }
 
-function normalizeCacheRecordDate(record: Record<string, unknown>): string {
+function readAcrosticCacheRecord(
+  record: Record<string, unknown>,
+  label: string,
+): AcrosticCacheRecord {
+  const date = normalizeCacheRecordDate(record, label);
+  const acrostic = readNonEmptyString(record, "acrostic", label).trim();
+
+  if (!BASE64_PATTERN.test(acrostic)) {
+    throw new Error(`Invalid ${label}: expected \`acrostic\` to be valid base64.`);
+  }
+
+  return { date, acrostic };
+}
+
+function validateAcrosticCacheRecords(
+  records: readonly AcrosticCacheRecord[],
+): void {
+  let previousDate: string | undefined;
+
+  for (const [index, record] of records.entries()) {
+    if (previousDate && record.date <= previousDate) {
+      throw new Error(
+        `Invalid acrostic cache entry ${index + 1}: dates must be strictly increasing.`,
+      );
+    }
+
+    previousDate = record.date;
+  }
+}
+
+function normalizeCacheRecordDate(
+  record: Record<string, unknown>,
+  label: string,
+): string {
   const value = record.date;
 
   if (typeof value !== "string") {
-    throw new Error(
-      "Invalid acrostic cache record: expected `date` to be a string.",
-    );
+    throw new Error(`Invalid ${label}: expected \`date\` to be a string.`);
   }
 
   try {
     return normalizeInputDate(value);
   } catch (error) {
-    throw new Error(
-      `Invalid acrostic cache record: ${getErrorMessage(error)}`,
-    );
+    throw new Error(`Invalid ${label}: ${getErrorMessage(error)}`);
   }
 }
 
