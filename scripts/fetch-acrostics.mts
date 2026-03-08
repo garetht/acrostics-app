@@ -10,6 +10,7 @@ import {
   parseWrappedPuzzleResponse,
   normalizeInputDate,
   XWORDINFO_ACROSTIC_ARCHIVE_URL,
+  XWORDINFO_ACROSTIC_REFERRER,
   XWORDINFO_TIME_ZONE,
 } from "../lib/xwordinfo/acrostics.mts";
 
@@ -19,6 +20,10 @@ type CliOptions =
   | {
       mode: "single";
       date: string;
+      outDir: string;
+    }
+  | {
+      mode: "all";
       outDir: string;
     }
   | {
@@ -36,6 +41,7 @@ type FetchResponseLike = {
 
 export type FetchLike = (
   input: string | URL,
+  init?: RequestInit,
 ) => Promise<FetchResponseLike>;
 
 type Logger = Pick<Console, "log" | "error">;
@@ -72,21 +78,28 @@ export function parseCliArgs(argv: readonly string[]): CliOptions {
     throw new Error(`Unknown argument: ${arg}`);
   }
 
-  if ((date ? 1 : 0) + (since ? 1 : 0) !== 1) {
-    throw new Error("Provide exactly one of --date or --since.");
+  if (date && since) {
+    throw new Error("Provide at most one of --date or --since.");
   }
 
   if (date) {
     return {
       mode: "single",
-      date: normalizeInputDate(date),
+      date: normalizeCliDateArg(date, "--date"),
+      outDir,
+    };
+  }
+
+  if (!since) {
+    return {
+      mode: "all",
       outDir,
     };
   }
 
   return {
     mode: "range",
-    since: normalizeInputDate(since ?? ""),
+    since: normalizeCliDateArg(since, "--since"),
     outDir,
   };
 }
@@ -110,14 +123,18 @@ export async function runFetchAcrostics(
     ? normalizeInputDate(dependencies.today)
     : getTodayInTimeZone(XWORDINFO_TIME_ZONE);
   const archiveHtml = await fetchText(XWORDINFO_ACROSTIC_ARCHIVE_URL, fetchImpl);
-  const availableDates = filterInclusiveDateRange(
-    extractAvailableAcrosticDates(archiveHtml),
-    options.since,
-    today,
-  );
+  const archiveDates = extractAvailableAcrosticDates(archiveHtml);
+  const availableDates =
+    options.mode === "range"
+      ? filterInclusiveDateRange(archiveDates, options.since, today)
+      : archiveDates.filter((date) => date <= today);
 
   if (availableDates.length === 0) {
-    logger.log(`No acrostics available between ${options.since} and ${today}.`);
+    if (options.mode === "range") {
+      logger.log(`No acrostics available between ${options.since} and ${today}.`);
+    } else {
+      logger.log(`No acrostics available in the archive through ${today}.`);
+    }
     return 0;
   }
 
@@ -163,7 +180,12 @@ async function fetchAndWritePuzzle(
 }
 
 async function fetchText(url: string, fetchImpl: FetchLike): Promise<string> {
-  const response = await fetchImpl(url);
+  const response = await fetchImpl(url, {
+    headers: {
+      Referer: XWORDINFO_ACROSTIC_REFERRER,
+    },
+    referrer: XWORDINFO_ACROSTIC_REFERRER,
+  });
 
   if (!response.ok) {
     const statusDetail = [response.status, response.statusText]
@@ -193,7 +215,15 @@ function getErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
-const defaultFetch: FetchLike = async (input) => fetch(input);
+function normalizeCliDateArg(value: string, flag: string): string {
+  try {
+    return normalizeInputDate(value);
+  } catch (error) {
+    throw new Error(`Invalid value for ${flag}: ${getErrorMessage(error)}`);
+  }
+}
+
+const defaultFetch: FetchLike = async (input, init) => fetch(input, init);
 
 async function main(): Promise<void> {
   try {

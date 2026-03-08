@@ -1,9 +1,11 @@
 import { gunzipSync } from "node:zlib";
 
 export const XWORDINFO_ACROSTIC_ARCHIVE_URL =
-  "https://www.xwordinfo.com/Acrostic/SelectAcrostic.asp";
+  "https://www.xwordinfo.com/SelectAcrostic";
 export const XWORDINFO_ACROSTIC_DATA_URL =
   "https://www.xwordinfo.com/JSON/AcrosticData.ashx";
+export const XWORDINFO_ACROSTIC_REFERRER =
+  "https://www.xwordinfo.com/Acrostic";
 export const XWORDINFO_TIME_ZONE = "America/New_York";
 
 export type XWordInfoPuzzleWrapper = {
@@ -17,7 +19,7 @@ export type XWordInfoPuzzle = {
   cols: number;
   copyright: string;
   date: string;
-  fullQuote: string;
+  fullQuote?: string | null;
   gridLetters: string;
   gridNumbers: number[];
   mapTitle: number[];
@@ -83,7 +85,7 @@ export function parseXWordInfoPuzzle(jsonText: string): XWordInfoPuzzle {
     cols: readInteger(record, "cols"),
     copyright: readString(record, "copyright"),
     date: readString(record, "date"),
-    fullQuote: readString(record, "fullQuote"),
+    fullQuote: readOptionalNullableString(record, "fullQuote"),
     gridLetters: readString(record, "gridLetters"),
     gridNumbers: readIntegerArray(record, "gridNumbers"),
     mapTitle: readIntegerArray(record, "mapTitle"),
@@ -248,6 +250,25 @@ function readIntegerArray(
   }
 
   return [...value];
+}
+
+function readOptionalNullableString(
+  record: Record<string, unknown>,
+  field: keyof XWordInfoPuzzle,
+): string | null | undefined {
+  const value = record[field];
+
+  if (value === undefined || value === null) {
+    return value;
+  }
+
+  if (typeof value !== "string") {
+    throw new Error(
+      `Invalid decoded XWordInfo puzzle: expected \`${field}\` to be a string, null, or omitted.`,
+    );
+  }
+
+  return value;
 }
 
 function parseDateParts(input: string): DateParts {

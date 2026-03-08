@@ -22,6 +22,14 @@ Open [http://localhost:3000](http://localhost:3000).
 
 The fetcher lives in [`scripts/fetch-acrostics.mts`](./scripts/fetch-acrostics.mts) and runs with Node's type-stripping support.
 
+### Fetch the Full Archive
+
+```bash
+npm run fetch:acrostics
+```
+
+With no arguments, the CLI fetches every published acrostic date in the archive through today in `America/New_York`.
+
 ### Fetch a Single Date
 
 ```bash
@@ -42,6 +50,12 @@ npm run fetch:acrostics -- --since 2026-01-01
 Range mode does not walk every calendar day. It first loads the XWord Info acrostic archive page, extracts the actual publication dates, filters them to the requested window, and then fetches each available puzzle date through today in `America/New_York`.
 
 ### Write to a Custom Directory
+
+```bash
+npm run fetch:acrostics -- --out-dir tmp/acrostics
+```
+
+or:
 
 ```bash
 npm run fetch:acrostics -- --since 2026-01-01 --out-dir tmp/acrostics
@@ -89,7 +103,7 @@ type XWordInfoPuzzle = {
   cols: number;
   copyright: string;
   date: string;
-  fullQuote: string;
+  fullQuote?: string | null;
   gridLetters: string;
   gridNumbers: number[];
   mapTitle: number[];
@@ -98,11 +112,13 @@ type XWordInfoPuzzle = {
 };
 ```
 
-Unknown extra fields in the decoded payload are ignored. Required known fields are validated strictly.
+Unknown extra fields in the decoded payload are ignored. Required known fields are validated strictly, except `fullQuote`, which is nullable or absent for some historical puzzles.
 
 ## CLI Behavior
 
-- Exactly one of `--date` or `--since` is required.
+- With no arguments, the CLI fetches the full published archive.
+- `--out-dir` can be used by itself or alongside `--date` / `--since`.
+- `--date` and `--since` are mutually exclusive.
 - Invalid dates fail fast with a clear error.
 - Range mode fetches dates sequentially.
 - If one date fails in range mode, later dates still run.
