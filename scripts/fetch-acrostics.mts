@@ -151,9 +151,12 @@ export async function runFetchAcrostics(
     return runSingleDateMode(options, outputs, cacheState, fetchImpl, logger);
   }
 
-  const today = dependencies.today
-    ? normalizeInputDate(dependencies.today)
-    : getTodayInTimeZone(XWORDINFO_TIME_ZONE);
+  const today = addDaysToDate(
+    dependencies.today
+      ? normalizeInputDate(dependencies.today)
+      : getTodayInTimeZone(XWORDINFO_TIME_ZONE),
+    7,
+  );
   const archiveHtml = await fetchText(XWORDINFO_ACROSTIC_ARCHIVE_URL, fetchImpl);
   const archiveDates = extractAvailableAcrosticDates(archiveHtml);
   const availableDates =
@@ -384,6 +387,14 @@ function filterDatesAfterCache(
   }
 
   return dates.filter((date) => date > lastCachedDate);
+}
+
+function addDaysToDate(input: string, days: number): string {
+  const normalizedDate = normalizeInputDate(input);
+  const [year, month, day] = normalizedDate.split("-").map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day));
+  date.setUTCDate(date.getUTCDate() + days);
+  return date.toISOString().slice(0, 10);
 }
 
 function describeFetchedWrite(
