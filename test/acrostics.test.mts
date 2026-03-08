@@ -8,12 +8,13 @@ import { gzipSync } from "node:zlib";
 import {
   buildAcrosticDataUrl,
   createAcrosticCacheRecord,
+  decodeAcrosticCache,
   decodeAcrosticCacheRecord,
   decodeWrappedPuzzleData,
+  encodeAcrosticCache,
   extractAvailableAcrosticDates,
   filterInclusiveDateRange,
   normalizeInputDate,
-  parseAcrosticCacheFile,
   parseSavedAcrosticPuzzle,
   parseWrappedPuzzleResponse,
   parseXWordInfoPuzzle,
@@ -123,36 +124,29 @@ test("saved acrostic puzzles omit copyright but preserve other fields", async ()
   );
 });
 
-test("cache records round-trip through the committed line format", async () => {
+test("gzipped cache files round-trip through the committed cache format", async () => {
   const puzzle = JSON.parse(await loadFixture("xwordinfo-puzzle.decoded.json"));
-  const cacheText = [
-    JSON.stringify(
-      createAcrosticCacheRecord("2026-03-01", { ...puzzle, date: "3/1/2026" }),
-    ),
-    JSON.stringify(
-      createAcrosticCacheRecord("2026-03-08", { ...puzzle, date: "3/8/2026" }),
-    ),
-    "",
-  ].join("\n");
+  const records = [
+    createAcrosticCacheRecord("2026-03-01", { ...puzzle, date: "3/1/2026" }),
+    createAcrosticCacheRecord("2026-03-08", { ...puzzle, date: "3/8/2026" }),
+  ];
 
-  const records = parseAcrosticCacheFile(cacheText);
+  const decodedRecords = decodeAcrosticCache(encodeAcrosticCache(records));
 
-  assert.deepEqual(records.map((record) => record.date), [
+  assert.deepEqual(decodedRecords.map((record) => record.date), [
     "2026-03-01",
     "2026-03-08",
   ]);
-  const decodedRecord = decodeAcrosticCacheRecord(records[1]);
+
+  const decodedRecord = decodeAcrosticCacheRecord(decodedRecords[1]);
   assert.equal(decodedRecord.puzzle.date, "3/8/2026");
   assert.equal("copyright" in decodedRecord.puzzle, false);
-  assert.equal(
-    "copyright" in JSON.parse(decodedRecord.decodedJson),
-    false,
-  );
+  assert.equal("copyright" in JSON.parse(decodedRecord.decodedJson), false);
 
   assert.throws(
     () =>
-      parseAcrosticCacheFile(
-        `${JSON.stringify(records[1])}\n${JSON.stringify(records[0])}\n`,
+      decodeAcrosticCache(
+        gzipSync(Buffer.from(JSON.stringify([records[1], records[0]]), "utf8")),
       ),
     /strictly increasing/i,
   );
@@ -199,20 +193,20 @@ test("parseCliArgs validates mode flags, dates, and cache output", () => {
     since: "2026-03-01",
     outDir: "tmp",
   });
-  assert.deepEqual(parseCliArgs(["--cache-file", "data/cache.ndjson"]), {
+  assert.deepEqual(parseCliArgs(["--cache-file", "data/cache.json.gz"]), {
     mode: "all",
-    cacheFile: "data/cache.ndjson",
+    cacheFile: "data/cache.json.gz",
   });
   assert.deepEqual(
     parseCliArgs([
       "--cache-file",
-      "data/cache.ndjson",
+      "data/cache.json.gz",
       "--out-dir",
       "tmp",
     ]),
     {
       mode: "all",
-      cacheFile: "data/cache.ndjson",
+      cacheFile: "data/cache.json.gz",
       outDir: "tmp",
     },
   );
@@ -269,13 +263,14 @@ test("runFetchAcrostics writes one file in single-date mode", async () => {
 test("runFetchAcrostics can materialize a single date from the cache file", async () => {
   const tempDir = await mkdtemp(path.join(os.tmpdir(), "acrostics-cache-hit-"));
   const outDir = path.join(tempDir, "out");
-  const cacheFile = path.join(tempDir, "acrostics.ndjson");
+  const cacheFile = path.join(tempDir, "acrostics.json.gz");
   const puzzle = JSON.parse(await loadFixture("xwordinfo-puzzle.decoded.json"));
 
   await writeFile(
     cacheFile,
-    `${JSON.stringify(createAcrosticCacheRecord("2026-03-08", puzzle))}\n`,
-    "utf8",
+    encodeAcrosticCache([
+      createAcrosticCacheRecord("2026-03-08", puzzle),
+    ]),
   );
 
   let fetchCalls = 0;
@@ -402,25 +397,19 @@ test("runFetchAcrostics with no args fetches the full published archive", async 
   assert.equal("copyright" in marchPuzzle, false);
 });
 
-test("runFetchAcrostics cache mode appends only uncached newer dates", async () => {
+test("runFetchAcrostics cache mode rewrites the gzipped cache with only new dates", async () => {
   const tempDir = await mkdtemp(path.join(os.tmpdir(), "acrostics-cache-mode-"));
-  const cacheFile = path.join(tempDir, "acrostics.ndjson");
+  const cacheFile = path.join(tempDir, "acrostics.json.gz");
   const archiveHtml = await loadFixture("acrostic-archive.html");
   const puzzle = JSON.parse(await loadFixture("xwordinfo-puzzle.decoded.json"));
   const fetchCalls: string[] = [];
 
   await writeFile(
     cacheFile,
-    [
-      JSON.stringify(
-        createAcrosticCacheRecord("2026-02-28", { ...puzzle, date: "2/28/2026" }),
-      ),
-      JSON.stringify(
-        createAcrosticCacheRecord("2026-03-01", { ...puzzle, date: "3/1/2026" }),
-      ),
-      "",
-    ].join("\n"),
-    "utf8",
+    encodeAcrosticCache([
+      createAcrosticCacheRecord("2026-02-28", { ...puzzle, date: "2/28/2026" }),
+      createAcrosticCacheRecord("2026-03-01", { ...puzzle, date: "3/1/2026" }),
+    ]),
   );
 
   const exitCode = await runFetchAcrostics(["--cache-file", cacheFile], {
@@ -448,7 +437,7 @@ test("runFetchAcrostics cache mode appends only uncached newer dates", async () 
     buildAcrosticDataUrl("2026-03-08"),
   ]);
 
-  const cacheRecords = parseAcrosticCacheFile(await readFile(cacheFile, "utf8"));
+  const cacheRecords = decodeAcrosticCache(await readFile(cacheFile));
   assert.deepEqual(
     cacheRecords.map((record) => record.date),
     ["2026-02-28", "2026-03-01", "2026-03-08"],

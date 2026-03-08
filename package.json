@@ -8,7 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "fetch:acrostics": "node --experimental-strip-types scripts/fetch-acrostics.mts",
-    "fetch:acrostics:cache": "node --experimental-strip-types scripts/fetch-acrostics.mts --cache-file data/xwordinfo/acrostics.ndjson",
+    "fetch:acrostics:cache": "node --experimental-strip-types scripts/fetch-acrostics.mts --cache-file data/xwordinfo/acrostics.json.gz",
     "test:acrostics": "node --experimental-strip-types --test test/**/*.test.mts"
   },
   "dependencies": {
