@@ -1,6 +1,5 @@
 "use client";
 import { useRouter } from "next/navigation";
-import { Peer, type DataConnection } from "peerjs";
 import { useEffect, useRef, useState } from "react";
 
 import {
@@ -19,9 +18,17 @@ import {
   type MultiplayerRole,
   type MultiplayerSessionRecord,
 } from "@/lib/acrostics-multiplayer";
-import { buildUrlWithBasePath } from "@/lib/site-paths";
 import { normalizePuzzle, type XWordInfoPuzzle } from "./acrostic";
 import { AcrosticBoard, type AcrosticBoardPresence } from "./acrostic-board";
+import {
+  multiplayerRuntime,
+  type MultiplayerConnection,
+  type MultiplayerPeer,
+} from "./multiplayer-runtime";
+import {
+  buildInviteUrl,
+  getPeerErrorMessage,
+} from "./multiplayer-screen.helpers";
 
 type MultiplayerScreenProps = {
   puzzle: XWordInfoPuzzle;
@@ -62,26 +69,6 @@ function toBoardEntries(
   return boardEntries;
 }
 
-function buildInviteUrl(sessionId: string, date: string) {
-  return buildUrlWithBasePath("/multiplayer/", {
-    date,
-    session: sessionId,
-  });
-}
-
-function getPeerErrorMessage(error: unknown) {
-  if (
-    error &&
-    typeof error === "object" &&
-    "message" in error &&
-    typeof (error as { message: unknown }).message === "string"
-  ) {
-    return (error as { message: string }).message;
-  }
-
-  return "Unable to establish the multiplayer connection.";
-}
-
 function getRejectedMessage(reason: MultiplayerMessage & { type: "join_reject" }) {
   return reason.message;
 }
@@ -104,8 +91,8 @@ export function MultiplayerScreen({
 
   const sessionRecordRef = useRef<MultiplayerSessionRecord | null>(null);
   const roleRef = useRef<MultiplayerRole | null>(null);
-  const peerRef = useRef<Peer | null>(null);
-  const connectionRef = useRef<DataConnection | null>(null);
+  const peerRef = useRef<MultiplayerPeer | null>(null);
+  const connectionRef = useRef<MultiplayerConnection | null>(null);
   const reconnectTimerRef = useRef<number | null>(null);
   const remoteFlashTimerRef = useRef<number | null>(null);
   const manualShutdownRef = useRef(false);
@@ -115,25 +102,22 @@ export function MultiplayerScreen({
   const boardEntries = sessionRecord ? toBoardEntries(sessionRecord.entriesByNumber) : {};
   const inviteUrl = buildInviteUrl(sessionId, selectedDate);
   const isGuestReadOnly = role === "guest" && phase !== "connected";
+  const hasTerminalError = phase === "rejected" || phase === "error";
 
   function clearReconnectTimer() {
-    if (reconnectTimerRef.current) {
-      window.clearTimeout(reconnectTimerRef.current);
-      reconnectTimerRef.current = null;
-    }
+    multiplayerRuntime.clearTimeout(reconnectTimerRef.current);
+    reconnectTimerRef.current = null;
   }
 
   function clearRemoteFlashTimer() {
-    if (remoteFlashTimerRef.current) {
-      window.clearTimeout(remoteFlashTimerRef.current);
-      remoteFlashTimerRef.current = null;
-    }
+    multiplayerRuntime.clearTimeout(remoteFlashTimerRef.current);
+    remoteFlashTimerRef.current = null;
   }
 
   function flashRemoteChanges(numbers: number[]) {
     clearRemoteFlashTimer();
     setRemoteFlashNumbers(numbers);
-    remoteFlashTimerRef.current = window.setTimeout(() => {
+    remoteFlashTimerRef.current = multiplayerRuntime.setTimeout(() => {
       setRemoteFlashNumbers([]);
       remoteFlashTimerRef.current = null;
     }, 1300);
@@ -192,12 +176,16 @@ export function MultiplayerScreen({
     setPhase("reconnecting");
     setStatusMessage(message);
 
-    reconnectTimerRef.current = window.setTimeout(() => {
+    reconnectTimerRef.current = multiplayerRuntime.setTimeout(() => {
+      reconnectTimerRef.current = null;
       connectGuestToHost();
     }, 1500);
   }
 
-  function handleHostMessage(connection: DataConnection, message: MultiplayerMessage) {
+  function handleHostMessage(
+    connection: MultiplayerConnection,
+    message: MultiplayerMessage,
+  ) {
     const currentRecord = sessionRecordRef.current;
 
     if (!currentRecord) {
@@ -282,7 +270,7 @@ export function MultiplayerScreen({
     }
   }
 
-  function attachHostConnection(connection: DataConnection) {
+  function attachHostConnection(connection: MultiplayerConnection) {
     connection.on("data", (raw) => {
       if (!isMultiplayerMessage(raw)) {
         return;
@@ -437,7 +425,7 @@ export function MultiplayerScreen({
   }
 
   function bootGuestPeer() {
-    const peer = new Peer();
+    const peer = multiplayerRuntime.createPeer();
     peerRef.current = peer;
 
     peer.on("open", () => {
@@ -504,7 +492,7 @@ export function MultiplayerScreen({
       sessionId,
       date: selectedDate,
       role: "guest",
-      clientId: crypto.randomUUID(),
+      clientId: multiplayerRuntime.randomUUID(),
       displayName: "Guest",
     });
 
@@ -535,7 +523,7 @@ export function MultiplayerScreen({
 
     if (role === "host") {
       const createHostPeer = () => {
-        const peer = new Peer(sessionId);
+        const peer = multiplayerRuntime.createPeer(sessionId);
         peerRef.current = peer;
 
         peer.on("open", () => {
@@ -563,7 +551,8 @@ export function MultiplayerScreen({
             setPhase("reconnecting");
             setStatusMessage("Reclaiming the host session...");
             clearReconnectTimer();
-            reconnectTimerRef.current = window.setTimeout(() => {
+            reconnectTimerRef.current = multiplayerRuntime.setTimeout(() => {
+              reconnectTimerRef.current = null;
               destroyPeer();
               createHostPeer();
             }, 1200);
@@ -582,7 +571,8 @@ export function MultiplayerScreen({
           setPhase("reconnecting");
           setStatusMessage("Host connection closed. Reclaiming the room...");
           clearReconnectTimer();
-          reconnectTimerRef.current = window.setTimeout(() => {
+          reconnectTimerRef.current = multiplayerRuntime.setTimeout(() => {
+            reconnectTimerRef.current = null;
             destroyPeer();
             createHostPeer();
           }, 1200);
@@ -624,9 +614,11 @@ export function MultiplayerScreen({
               <p className="mt-3 max-w-3xl text-sm leading-6 text-[color:var(--muted)]">
                 {normalized.meta.quote}
               </p>
-              <p className="mt-4 text-sm font-semibold text-[color:var(--remote-ink)]">
-                {statusMessage}
-              </p>
+              {!hasTerminalError ? (
+                <p className="mt-4 text-sm font-semibold text-[color:var(--remote-ink)]">
+                  {statusMessage}
+                </p>
+              ) : null}
             </div>
 
             <div className="flex flex-col gap-4 xl:items-end">
@@ -644,7 +636,7 @@ export function MultiplayerScreen({
                     className="rounded-full border border-[color:var(--remote-accent)] bg-[color:var(--remote-soft)] px-4 py-2 text-sm font-semibold uppercase tracking-[0.14em] text-[color:var(--remote-ink)] transition hover:bg-[#c8daef]"
                     onClick={async () => {
                       try {
-                        await navigator.clipboard.writeText(inviteUrl);
+                        await multiplayerRuntime.writeClipboardText(inviteUrl);
                         setCopyStatus("copied");
                       } catch {
                         setCopyStatus("error");
@@ -679,7 +671,7 @@ export function MultiplayerScreen({
           </div>
         </header>
 
-        {phase === "rejected" || phase === "error" ? (
+        {hasTerminalError ? (
           <section className="rounded-[2rem] border border-[color:var(--danger)] bg-[color:var(--danger-soft)] p-5 shadow-[0_18px_40px_-30px_rgba(92,31,23,0.42)]">
             <p className="text-sm font-semibold uppercase tracking-[0.28em] text-[color:var(--danger-ink)]">
               Multiplayer unavailable
@@ -706,7 +698,7 @@ export function MultiplayerScreen({
                   currentRecord,
                   changes,
                   currentRecord.clientId,
-                  crypto.randomUUID(),
+                  multiplayerRuntime.randomUUID(),
                 );
 
                 replaceSessionRecord(accepted.sessionRecord);
@@ -726,7 +718,7 @@ export function MultiplayerScreen({
               connectionRef.current?.send({
                 type: "client_patch",
                 patch: {
-                  clientOpId: crypto.randomUUID(),
+                  clientOpId: multiplayerRuntime.randomUUID(),
                   changedBy: currentRecord.clientId,
                   changes,
                 },
