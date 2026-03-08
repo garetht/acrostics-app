@@ -6,7 +6,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "fetch:acrostics": "node --experimental-strip-types scripts/fetch-acrostics.mts",
+    "test:acrostics": "node --experimental-strip-types --test test/**/*.test.mts"
   },
   "dependencies": {
     "next": "16.1.6",
