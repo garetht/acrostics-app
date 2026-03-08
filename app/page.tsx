@@ -1,90 +1,25 @@
-import { AcrosticPuzzleScreen } from "./acrostic-puzzle-screen";
-import type { XWordInfoPuzzle } from "./acrostic";
+import { getBundledAcrosticSelection, readDateSearchParam } from "@/lib/acrostics-archive";
+import { AcrosticsArchiveScreen } from "./acrostics-archive-screen";
 
-const samplePuzzle: XWordInfoPuzzle = {
-  answerKey:
-    "THERE ARE IN THE VIOLIN ACCENTS SO CLOSELY AKIN TO THOSE OF CONTRALTO VOICES THAT ONE HAS THE ILLUSION THAT A SINGER HAS TAKEN HER PLACE AMID THE ORCHESTRA AT TIMES ONE BELIEVES ONE IS LISTENING TO A CAPTIVE GENIE",
-  clueData: [
-    "165,36,170,97,156,15,10,91",
-    "126,6,52,18,25,133",
-    "50,45,163,114,79,34,20,125,94",
-    "80,24,168,123,9,30",
-    "153,29,146,99,67,77,142",
-    "130,57,16,40,65,127,110,43,137",
-    "141,103,22,72,75,28,59,1,90",
-    "172,152,121,102,92,70",
-    "98,74,112,143,13",
-    "33,78,37,68",
-    "100,64,117,47,145",
-    "7,174,138,62,21",
-    "61,12,157,136,106,76,73,88",
-    "122,131,55,128,95,35,104,89,96,69",
-    "161,58,169,53,11,44,84,155,134",
-    "48,60,51,159,8,120,167,19,93,32",
-    "108,31,41,101,150,23,118",
-    "135,49,85,66,14,3",
-    "124,2,46,164,154,86,148,81",
-    "116,71,144,107,38,162,158,119",
-    "129,4,82,17,151",
-    "173,147,42,139,26,166,54,160,111",
-    "132,171,140,83,115,149,105,63",
-    "5,109,27,56,113,87,39",
-  ],
-  clues: [
-    "Niccol&#242; ____, virtuoso said to have made a pact with the devil",
-    "Like an ostrich or emu",
-    "Use vibrato, say; swing back and forth",
-    "Do as Salome did with each of her seven face covers in Strauss&#39;s opera",
-    "George W. Bush&#39;s White House dog Barney, for one",
-    "Odontalgia",
-    "Teamed up, colluding (2 wds.)",
-    "____ Creed, statement setting the Trinity as a central Christian doctrine",
-    "Old kind of church made entirely of wood, including the nails",
-    "Nevada city that was the destination of the U.S.&#39;s first commercial airmail flight",
-    "Eldest of the Three Musketeers",
-    "Ancient three-stringed, bowed instrument",
-    "Support often found under the jaw of Answer N. (2 wds.)",
-    "Celebrated female fiddler with an alliterative name (2 wds.)",
-    "Intimations, subcurrents",
-    "Digital blueprints for guitarists?",
-    "Quick peek, once-over (hyph.)",
-    "What precedes a sestet in a Petrarchan sonnet; musical interval",
-    "Encases",
-    "1993 Jane Campion film about a voluntary mute (2 wds.)",
-    "Bird sound; musical ornament",
-    "Lacking the will?",
-    "Tunes",
-    "George ____, entrepreneur who revolutionized photography",
-  ],
-  cols: 27,
-  copyright: "2025 The New York Times",
-  date: "2/23/2025",
-  fullQuote: null,
-  gridLetters:
-    "GSRUX BLP DA OMI RAFUBP CLGQDBV XG EDQPJCN AJTX FQ VFOCS KP RCPBOVNXF OGPMLW KFRE JNH TGM IGM EJCDSUWO RSXM N GAHPCN NAI EKQHG NWM TQXFV IXCW TKQ TPHNDSCBF NU FNWBO RMF LVWGEITK EVS WQ UHESOAMTP VO T CSAVPDO AWHVL",
-  gridNumbers: [
-    1, 2, 3, 4, 5, 0, 6, 7, 8, 0, 9, 10, 0, 11, 12, 13, 0, 14, 15, 16, 17, 18, 19,
-    0, 20, 21, 22, 23, 24, 25, 26, 0, 27, 28, 0, 29, 30, 31, 32, 33, 34, 35, 0, 36,
-    37, 38, 39, 0, 40, 41, 0, 42, 43, 44, 45, 46, 0, 47, 48, 0, 49, 50, 51, 52, 53,
-    54, 55, 56, 57, 0, 58, 59, 60, 61, 62, 63, 0, 64, 65, 66, 67, 0, 68, 69, 70, 0,
-    71, 72, 73, 0, 74, 75, 76, 0, 77, 78, 79, 80, 81, 82, 83, 84, 0, 85, 86, 87, 88,
-    0, 89, 0, 90, 91, 92, 93, 94, 95, 0, 96, 97, 98, 0, 99, 100, 101, 102, 103, 0,
-    104, 105, 106, 0, 107, 108, 109, 110, 111, 0, 112, 113, 114, 115, 0, 116, 117,
-    118, 0, 119, 120, 121, 122, 123, 124, 125, 126, 127, 0, 128, 129, 0, 130, 131,
-    132, 133, 134, 0, 135, 136, 137, 0, 138, 139, 140, 141, 142, 143, 144, 145, 0,
-    146, 147, 148, 0, 149, 150, 0, 151, 152, 153, 154, 155, 156, 157, 158, 159, 0,
-    160, 161, 0, 162, 0, 163, 164, 165, 166, 167, 168, 169, 0, 170, 171, 172, 173,
-    174,
-  ],
-  mapTitle: [
-    165, 126, 50, 80, 153, 130, 141, 172, 98, 33, 100, 7, 61, 122, 161, 48, 108, 135,
-    124, 116, 129, 173, 132, 5,
-  ],
-  quote:
-    "(MARCEL) PROUST, IN SEARCH OF LOST TIME (translated by C. K. Scott Moncrieff) \u2014There are in the \u2026 violin \u2026 accents \u2026 so closely akin to those of \u2026 contralto voices, that one has the illusion that a singer has taken her place amid the orchestra. \u2026 [A]t times \u2026 one believes \u2026 one is listening to a captive genie.",
-  rows: 8,
+type SearchParams = Record<string, string | string[] | undefined>;
+
+type HomeProps = {
+  searchParams?: Promise<SearchParams> | SearchParams;
 };
 
-export default function Home() {
-  return <AcrosticPuzzleScreen puzzle={samplePuzzle} />;
+export default async function Home({ searchParams }: HomeProps) {
+  const resolvedSearchParams = ((await searchParams) ?? {}) as SearchParams;
+  const requestedDate = readDateSearchParam(resolvedSearchParams.date);
+  const { availableDates, cellCountByDate, latestDate, puzzle, selectedDate } =
+    getBundledAcrosticSelection(requestedDate);
+
+  return (
+    <AcrosticsArchiveScreen
+      availableDates={availableDates}
+      cellCountByDate={cellCountByDate}
+      latestDate={latestDate}
+      puzzle={puzzle}
+      selectedDate={selectedDate}
+    />
+  );
 }
