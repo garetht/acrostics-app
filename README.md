@@ -20,22 +20,72 @@ Open [http://localhost:3000](http://localhost:3000).
 
 ## GitHub Pages Deployment
 
-The app is configured for static export so it can be published to GitHub Pages without an app server:
+This repository is already configured to deploy to GitHub Pages as a static export. The key pieces are:
+
+- `next.config.ts`: enables `output: "export"` and `trailingSlash: true`
+- `package.json`: runs `next build --webpack`
+- `.github/workflows/pages.yml`: builds and deploys `out/`
+
+### One-Time GitHub Setup
+
+1. Push the deployment-ready code to your default branch.
+   The Pages workflow currently runs on pushes to `main` and `master`.
+2. Enable GitHub Pages to deploy from Actions.
+   In GitHub, open `Settings` > `Pages` > `Build and deployment` and set `Source` to `GitHub Actions`.
+3. Confirm the site path.
+   The current workflow assumes a project site at `https://<user>.github.io/acrostics-app/`.
+   If your repository name or Pages path is different, update `NEXT_PUBLIC_BASE_PATH` in `.github/workflows/pages.yml`.
+   Example: if the repo is `crosswords`, set `NEXT_PUBLIC_BASE_PATH: /crosswords`.
+   If you deploy at the domain root, set `NEXT_PUBLIC_BASE_PATH: /` or remove the override.
+
+### Local Verification
+
+Before pushing, verify the static export locally:
 
 ```bash
 npm install
-npm run build
+NEXT_PUBLIC_BASE_PATH=/acrostics-app npm run build
 ```
 
 The production build writes the exported site to `out/`.
 
-For project-site deployments under a repository subpath, set `NEXT_PUBLIC_BASE_PATH` at build time. Example:
+Confirm that the export contains:
+
+- `out/index.html`
+- `out/multiplayer/index.html`
+- `out/acrostics/manifest.json`
+
+The build also generates browser-fetchable archive assets in `public/acrostics` before export. Those files are derived from the committed cache and are not meant to be edited by hand.
+
+### Automatic Deployment
+
+After GitHub Pages is configured, deploy by either:
+
+- pushing to `main` or `master`
+- running the `Deploy GitHub Pages` workflow manually from the Actions tab
+
+The workflow will:
+
+- use Node 24
+- run `npm ci`
+- run `npm run build`
+- upload `out/`
+- deploy with `actions/deploy-pages`
+
+### Post-Deploy Smoke Test
+
+After the workflow finishes, open the Pages URL from the workflow run or Pages settings and verify:
+
+- `/acrostics-app/`
+- `/acrostics-app/multiplayer/`
+- archive URLs with `?date=...`
+- copied multiplayer invite links
+
+For manual local builds outside the workflow, set `NEXT_PUBLIC_BASE_PATH` at build time for project-site deployments under a repository subpath. Example:
 
 ```bash
 NEXT_PUBLIC_BASE_PATH=/acrostics-app npm run build
 ```
-
-The build also generates browser-fetchable archive assets in `public/acrostics` before export. Those files are derived from the committed cache and are not meant to be edited by hand.
 
 Multiplayer still depends on external PeerJS/WebRTC signaling; GitHub Pages only hosts the static frontend.
 

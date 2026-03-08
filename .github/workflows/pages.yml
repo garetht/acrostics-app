@@ -20,6 +20,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     env:
+      # Change this if the published Pages URL path differs from /acrostics-app.
       NEXT_PUBLIC_BASE_PATH: /acrostics-app
 
     steps:
