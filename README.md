@@ -1,36 +1,132 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Acrostics App
 
-## Getting Started
+This repository contains a Next.js app plus a typed Node/TypeScript CLI for fetching and decoding XWord Info acrostic data.
 
-First, run the development server:
+## Requirements
+
+- Node.js 24+
+- npm
+
+## App Development
+
+Install dependencies and start the app:
 
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Acrostic Fetch CLI
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+The fetcher lives in [`scripts/fetch-acrostics.mts`](./scripts/fetch-acrostics.mts) and runs with Node's type-stripping support.
 
-## Learn More
+### Fetch the Full Archive to Per-Date JSON Files
 
-To learn more about Next.js, take a look at the following resources:
+```bash
+npm run fetch:acrostics
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+With no arguments, the CLI fetches every published acrostic date in the archive through today in `America/New_York` and writes one decoded file per date to `data/xwordinfo/acrostics`.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+### Fetch Into the Repository Cache File
 
-## Deploy on Vercel
+```bash
+npm run fetch:acrostics:cache
+```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+This writes newline-delimited JSON records to `data/xwordinfo/acrostics.ndjson` in the repository:
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```json
+{"date":"2026-03-08","acrostic":"<base64 gzipped decoded puzzle json>"}
+```
+
+The cache file is append-only and date-ordered. When it already contains data, the fetcher reads the last line and only requests dates after that cached date.
+
+### Fetch a Single Date
+
+```bash
+npm run fetch:acrostics -- --date 2026-03-08
+```
+
+Accepted date formats:
+
+- `YYYY-MM-DD`
+- `M/D/YYYY`
+
+### Fetch All Published Dates Since a Start Date
+
+```bash
+npm run fetch:acrostics -- --since 2026-01-01
+```
+
+Range mode does not walk every calendar day. It first loads the XWord Info acrostic archive page, extracts the actual publication dates, filters them to the requested window, and then fetches each available puzzle date through today in `America/New_York`.
+
+### Select Output Targets Explicitly
+
+Write only the committed cache file:
+
+```bash
+npm run fetch:acrostics -- --cache-file data/xwordinfo/acrostics.ndjson
+```
+
+Write only per-date JSON files to a custom directory:
+
+```bash
+npm run fetch:acrostics -- --out-dir tmp/acrostics
+```
+
+Write both outputs in the same run:
+
+```bash
+npm run fetch:acrostics -- --since 2026-01-01 --out-dir tmp/acrostics --cache-file data/xwordinfo/acrostics.ndjson
+```
+
+If `--cache-file` is supplied for `--date`, the CLI first checks the committed cache file for that date. A cache hit can materialize the per-date JSON file without making a network request.
+
+## Response Decoding and Typing
+
+The XWord Info endpoint returns JSON shaped like:
+
+```json
+{
+  "data": "<base64 gzipped json>"
+}
+```
+
+The fetcher:
+
+1. Parses the wrapper object.
+2. Base64-decodes `data`.
+3. Gunzips the payload.
+4. Parses the decoded JSON into typed models.
+5. Validates the required fields before writing the file or cache record.
+
+The typed models and parsing helpers live in [`lib/xwordinfo/acrostics.mts`](./lib/xwordinfo/acrostics.mts).
+
+## CLI Behavior
+
+- With no arguments, the CLI fetches the full published archive into per-date JSON files.
+- `--out-dir` and `--cache-file` can be used independently or together.
+- `--date` and `--since` are mutually exclusive.
+- Invalid dates fail fast with a clear error.
+- Range mode fetches dates sequentially.
+- If one date fails in range mode, later dates still run.
+- Range mode exits non-zero if any dates fail and prints a failure summary.
+- Cache-file mode assumes records are sorted by ascending date with exactly one line per date.
+
+## Testing
+
+Run the targeted fetcher test suite with:
+
+```bash
+npm run test:acrostics
+```
+
+The tests cover wrapper parsing, base64 and gzip decoding, typed puzzle validation, archive date extraction, CLI argument validation, per-file output, cache-file output, cache hits, and partial-failure handling.
+
+## Notes
+
+- Live fetches require network access to `www.xwordinfo.com`.
+- The CLI is dependency-free beyond the repo's existing Node/TypeScript toolchain.
