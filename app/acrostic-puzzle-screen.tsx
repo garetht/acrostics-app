@@ -1,11 +1,25 @@
 "use client";
 
-import { useEffect, useRef, useState, type ClipboardEvent, type KeyboardEvent } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  type ClipboardEvent,
+  type KeyboardEvent,
+} from "react";
 
+import {
+  countFilledEntries,
+  getStoredEntriesForDate,
+  loadStoredAcrosticProgress,
+  saveStoredEntriesForDate,
+} from "@/lib/acrostics-progress";
 import { normalizePuzzle, type XWordInfoPuzzle } from "./acrostic";
 
 export type AcrosticPuzzleScreenProps = {
+  onProgressChange?: (filledCount: number) => void;
   puzzle: XWordInfoPuzzle;
+  storageDate: string;
 };
 
 function cx(...values: Array<string | false | null | undefined>) {
@@ -16,20 +30,33 @@ function sanitizeLetters(value: string) {
   return value.toUpperCase().replace(/[^A-Z]/g, "");
 }
 
-export function AcrosticPuzzleScreen({ puzzle }: AcrosticPuzzleScreenProps) {
+export function AcrosticPuzzleScreen({
+  onProgressChange,
+  puzzle,
+  storageDate,
+}: AcrosticPuzzleScreenProps) {
   const normalized = normalizePuzzle(puzzle);
   const firstClue = normalized.clues[0];
+  const firstClueId = firstClue?.id ?? "";
+  const firstClueNumber = firstClue?.numbers[0] ?? null;
+  const gridNumbersInOrder = normalized.lookup.gridNumbersInOrder;
+  const gridNumbersKey = gridNumbersInOrder.join(",");
 
   const [entriesByNumber, setEntriesByNumber] = useState<Record<number, string>>({});
-  const [activeClueId, setActiveClueId] = useState(firstClue?.id ?? "");
-  const [activeNumber, setActiveNumber] = useState<number | null>(firstClue?.numbers[0] ?? null);
+  const [activeClueId, setActiveClueId] = useState(firstClueId);
+  const [activeNumber, setActiveNumber] = useState<number | null>(firstClueNumber);
 
   const clueInputRefs = useRef<Record<number, HTMLInputElement | null>>({});
   const gridInputRefs = useRef<Record<number, HTMLInputElement | null>>({});
   const focusSurfaceRef = useRef<"clue" | "grid">("clue");
+  const hasHydratedStorageRef = useRef(false);
+  const onProgressChangeRef = useRef(onProgressChange);
+  const skipNextPersistRef = useRef(false);
 
   const activeClue =
-    normalized.clues.find((clue) => clue.id === activeClueId) ?? normalized.clues[0] ?? null;
+    normalized.clues.find((clue) => clue.id === activeClueId) ??
+    normalized.clues[0] ??
+    null;
 
   function focusInput(number: number, surface: "clue" | "grid") {
     requestAnimationFrame(() => {
@@ -88,7 +115,7 @@ export function AcrosticPuzzleScreen({ puzzle }: AcrosticPuzzleScreenProps) {
 
   function getSequence(number: number, surface: "clue" | "grid") {
     if (surface === "grid") {
-      return normalized.lookup.gridNumbersInOrder;
+      return gridNumbersInOrder;
     }
 
     const clueId = normalized.lookup.clueIdByNumber[number];
@@ -111,10 +138,16 @@ export function AcrosticPuzzleScreen({ puzzle }: AcrosticPuzzleScreenProps) {
     focusInput(number, surface);
   }
 
-  function setActiveClue(clueId: string, surface: "clue" | "grid", preferredNumber?: number) {
+  function setActiveClue(
+    clueId: string,
+    surface: "clue" | "grid",
+    preferredNumber?: number,
+  ) {
     const numbers = normalized.lookup.numbersByClueId[clueId] ?? [];
     const targetNumber =
-      preferredNumber && numbers.includes(preferredNumber) ? preferredNumber : numbers[0];
+      preferredNumber && numbers.includes(preferredNumber)
+        ? preferredNumber
+        : numbers[0];
 
     focusSurfaceRef.current = surface;
 
@@ -152,7 +185,11 @@ export function AcrosticPuzzleScreen({ puzzle }: AcrosticPuzzleScreenProps) {
     }
   }
 
-  function handlePaste(event: ClipboardEvent<HTMLInputElement>, number: number, surface: "clue" | "grid") {
+  function handlePaste(
+    event: ClipboardEvent<HTMLInputElement>,
+    number: number,
+    surface: "clue" | "grid",
+  ) {
     event.preventDefault();
 
     const letters = sanitizeLetters(event.clipboardData.getData("text"));
@@ -178,7 +215,11 @@ export function AcrosticPuzzleScreen({ puzzle }: AcrosticPuzzleScreenProps) {
     }
   }
 
-  function handleKeyDown(event: KeyboardEvent<HTMLInputElement>, number: number, surface: "clue" | "grid") {
+  function handleKeyDown(
+    event: KeyboardEvent<HTMLInputElement>,
+    number: number,
+    surface: "clue" | "grid",
+  ) {
     if (event.key === "Backspace") {
       event.preventDefault();
 
@@ -228,6 +269,48 @@ export function AcrosticPuzzleScreen({ puzzle }: AcrosticPuzzleScreenProps) {
   }
 
   useEffect(() => {
+    onProgressChangeRef.current = onProgressChange;
+  }, [onProgressChange]);
+
+  useEffect(() => {
+    setActiveClueId(firstClueId);
+    setActiveNumber(firstClueNumber);
+    focusSurfaceRef.current = "clue";
+    skipNextPersistRef.current = true;
+
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const progressMap = loadStoredAcrosticProgress(window.localStorage);
+    const storedEntries = getStoredEntriesForDate(
+      progressMap,
+      storageDate,
+      gridNumbersInOrder,
+    );
+
+    hasHydratedStorageRef.current = true;
+    setEntriesByNumber(storedEntries);
+  }, [firstClueId, firstClueNumber, gridNumbersKey, storageDate]);
+
+  useEffect(() => {
+    if (!hasHydratedStorageRef.current || typeof window === "undefined") {
+      return;
+    }
+
+    if (skipNextPersistRef.current) {
+      skipNextPersistRef.current = false;
+      return;
+    }
+
+    saveStoredEntriesForDate(window.localStorage, storageDate, entriesByNumber);
+  }, [entriesByNumber, storageDate]);
+
+  useEffect(() => {
+    onProgressChangeRef.current?.(countFilledEntries(entriesByNumber, gridNumbersInOrder));
+  }, [entriesByNumber, gridNumbersKey]);
+
+  useEffect(() => {
     if (typeof activeNumber === "number") {
       focusInput(activeNumber, focusSurfaceRef.current);
     }
@@ -241,8 +324,8 @@ export function AcrosticPuzzleScreen({ puzzle }: AcrosticPuzzleScreenProps) {
   const titleCellCount = Math.max(1, normalized.titleCells.length);
 
   return (
-    <div className="min-h-screen px-4 py-6 md:px-8 md:py-8">
-      <main className="mx-auto flex w-full max-w-[1440px] flex-col gap-6">
+    <div className="min-w-0">
+      <main className="flex w-full flex-col gap-6">
         <header className="rounded-[2rem] border border-[color:var(--line)] bg-[color:var(--panel)] p-6 shadow-[0_24px_70px_-40px_rgba(60,36,18,0.45)]">
           <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
             <div className="max-w-4xl">
@@ -259,7 +342,7 @@ export function AcrosticPuzzleScreen({ puzzle }: AcrosticPuzzleScreenProps) {
 
             <div className="text-sm text-[color:var(--muted)]">
               <p>{normalized.meta.date}</p>
-              <p>{normalized.meta.copyright}</p>
+              {normalized.meta.copyright ? <p>{normalized.meta.copyright}</p> : null}
             </div>
           </div>
         </header>

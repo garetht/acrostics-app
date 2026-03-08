@@ -3,7 +3,7 @@ export type XWordInfoPuzzle = {
   clueData: string[];
   clues: string[];
   cols: number;
-  copyright: string;
+  copyright?: string | null;
   date: string;
   fullQuote?: string | null;
   gridLetters: string;
@@ -38,7 +38,7 @@ export type NormalizedTitleCell = {
 export type NormalizedAcrosticPuzzle = {
   meta: {
     answerKey: string;
-    copyright: string;
+    copyright: string | null;
     date: string;
     fullQuote: string | null;
     quote: string;
@@ -216,7 +216,7 @@ export function normalizePuzzle(puzzle: XWordInfoPuzzle): NormalizedAcrosticPuzz
     },
     meta: {
       answerKey: puzzle.answerKey,
-      copyright: puzzle.copyright,
+      copyright: puzzle.copyright ?? null,
       date: puzzle.date,
       fullQuote: puzzle.fullQuote ?? null,
       quote: decodeHtmlEntities(puzzle.quote),
