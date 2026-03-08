@@ -8,6 +8,9 @@
     "start": "next start",
     "lint": "eslint",
     "test": "npm run lint && npm run test:acrostics && npm run build",
+    "generate:acrostics-bundle": "node --experimental-strip-types scripts/generate-acrostics-bundle.mts",
+    "predev": "npm run generate:acrostics-bundle",
+    "prebuild": "npm run generate:acrostics-bundle",
     "fetch:acrostics": "node --experimental-strip-types scripts/fetch-acrostics.mts",
     "fetch:acrostics:cache": "node --experimental-strip-types scripts/fetch-acrostics.mts --cache-file data/xwordinfo/acrostics.json.gz",
     "test:acrostics": "node --experimental-strip-types --test test/**/*.test.mts"
