@@ -4,7 +4,7 @@ import { AcrosticsArchiveScreen } from "./acrostics-archive-screen";
 type SearchParams = Record<string, string | string[] | undefined>;
 
 type HomeProps = {
-  searchParams?: Promise<SearchParams> | SearchParams;
+  searchParams?: Promise<SearchParams>;
 };
 
 export default async function Home({ searchParams }: HomeProps) {

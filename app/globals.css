@@ -12,6 +12,12 @@
   --accent: #efc447;
   --accent-ink: #7c4711;
   --accent-soft: #f7e8a8;
+  --remote-accent: #7ea0d6;
+  --remote-ink: #27456e;
+  --remote-soft: #dce7f7;
+  --danger: #cf6855;
+  --danger-ink: #7d2b20;
+  --danger-soft: #f7e1dd;
   --line: #b7aa96;
   --muted: #705a47;
 }
