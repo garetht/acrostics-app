@@ -92,9 +92,6 @@ export function AcrosticPuzzleScreen({
               <h1 className="mt-3 text-4xl font-semibold tracking-[-0.04em] text-[color:var(--foreground)]">
                 Acrostic Solver
               </h1>
-              <p className="mt-3 max-w-3xl text-sm leading-6 text-[color:var(--muted)]">
-                {normalized.meta.quote}
-              </p>
             </div>
 
             <div className="flex flex-col gap-4 lg:items-end">
