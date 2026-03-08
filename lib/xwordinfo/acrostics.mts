@@ -1,4 +1,4 @@
-import { gunzipSync } from "node:zlib";
+import { gunzipSync, gzipSync } from "node:zlib";
 
 export const XWORDINFO_ACROSTIC_ARCHIVE_URL =
   "https://www.xwordinfo.com/SelectAcrostic";
@@ -27,6 +27,13 @@ export type XWordInfoPuzzle = {
   rows: number;
 };
 
+export type SavedAcrosticPuzzle = Omit<XWordInfoPuzzle, "copyright">;
+
+export type AcrosticCacheRecord = {
+  date: string;
+  acrostic: string;
+};
+
 type DateParts = {
   year: number;
   month: number;
@@ -43,13 +50,7 @@ export function parseXWordInfoPuzzleWrapper(
   jsonText: string,
 ): XWordInfoPuzzleWrapper {
   const record = parseJsonRecord(jsonText, "XWordInfo puzzle wrapper");
-  const data = record.data;
-
-  if (typeof data !== "string" || data.trim() === "") {
-    throw new Error(
-      "Invalid XWordInfo puzzle wrapper: expected a non-empty string in `data`.",
-    );
-  }
+  const data = readNonEmptyString(record, "data", "XWordInfo puzzle wrapper");
 
   return { data };
 }
@@ -57,40 +58,19 @@ export function parseXWordInfoPuzzleWrapper(
 export function decodeWrappedPuzzleData(
   wrapper: XWordInfoPuzzleWrapper,
 ): string {
-  const data = wrapper.data.trim();
-
-  if (!BASE64_PATTERN.test(data)) {
-    throw new Error(
-      "Invalid XWordInfo puzzle wrapper: `data` is not valid base64.",
-    );
-  }
-
-  try {
-    const compressed = Buffer.from(data, "base64");
-    return gunzipSync(compressed).toString("utf8");
-  } catch (error) {
-    throw new Error(
-      `Unable to decode XWordInfo puzzle payload: ${getErrorMessage(error)}`,
-    );
-  }
+  return decodeGzippedBase64(
+    wrapper.data,
+    "XWordInfo puzzle wrapper",
+    "Unable to decode XWordInfo puzzle payload",
+  );
 }
 
 export function parseXWordInfoPuzzle(jsonText: string): XWordInfoPuzzle {
   const record = parseJsonRecord(jsonText, "decoded XWordInfo puzzle");
 
   return {
-    answerKey: readString(record, "answerKey"),
-    clueData: readStringArray(record, "clueData"),
-    clues: readStringArray(record, "clues"),
-    cols: readInteger(record, "cols"),
+    ...readSavedPuzzleFields(record, "decoded XWordInfo puzzle"),
     copyright: readString(record, "copyright"),
-    date: readString(record, "date"),
-    fullQuote: readOptionalNullableString(record, "fullQuote"),
-    gridLetters: readString(record, "gridLetters"),
-    gridNumbers: readIntegerArray(record, "gridNumbers"),
-    mapTitle: readIntegerArray(record, "mapTitle"),
-    quote: readString(record, "quote"),
-    rows: readInteger(record, "rows"),
   };
 }
 
@@ -104,6 +84,94 @@ export function parseWrappedPuzzleResponse(jsonText: string): {
   const puzzle = parseXWordInfoPuzzle(decodedJson);
 
   return { wrapper, decodedJson, puzzle };
+}
+
+export function toSavedAcrosticPuzzle(
+  puzzle: XWordInfoPuzzle,
+): SavedAcrosticPuzzle {
+  const { copyright: _copyright, ...savedPuzzle } = puzzle;
+  return savedPuzzle;
+}
+
+export function parseSavedAcrosticPuzzle(jsonText: string): SavedAcrosticPuzzle {
+  const record = parseJsonRecord(jsonText, "saved acrostic puzzle");
+  return readSavedPuzzleFields(record, "saved acrostic puzzle");
+}
+
+export function createAcrosticCacheRecord(
+  date: string,
+  puzzle: XWordInfoPuzzle,
+): AcrosticCacheRecord {
+  return {
+    date: normalizeInputDate(date),
+    acrostic: encodeGzippedBase64(JSON.stringify(toSavedAcrosticPuzzle(puzzle))),
+  };
+}
+
+export function parseAcrosticCacheRecord(jsonText: string): AcrosticCacheRecord {
+  const record = parseJsonRecord(jsonText, "acrostic cache record");
+  const date = normalizeCacheRecordDate(record);
+  const acrostic = readNonEmptyString(
+    record,
+    "acrostic",
+    "acrostic cache record",
+  ).trim();
+
+  if (!BASE64_PATTERN.test(acrostic)) {
+    throw new Error(
+      "Invalid acrostic cache record: expected `acrostic` to be valid base64.",
+    );
+  }
+
+  return { date, acrostic };
+}
+
+export function parseAcrosticCacheFile(text: string): AcrosticCacheRecord[] {
+  const records: AcrosticCacheRecord[] = [];
+  let previousDate: string | undefined;
+
+  for (const [index, rawLine] of text.split(/\r?\n/).entries()) {
+    const line = rawLine.trim();
+
+    if (line === "") {
+      continue;
+    }
+
+    let record: AcrosticCacheRecord;
+
+    try {
+      record = parseAcrosticCacheRecord(line);
+    } catch (error) {
+      throw new Error(
+        `Invalid acrostic cache file line ${index + 1}: ${getErrorMessage(error)}`,
+      );
+    }
+
+    if (previousDate && record.date <= previousDate) {
+      throw new Error(
+        `Invalid acrostic cache file line ${index + 1}: dates must be strictly increasing.`,
+      );
+    }
+
+    records.push(record);
+    previousDate = record.date;
+  }
+
+  return records;
+}
+
+export function decodeAcrosticCacheRecord(record: AcrosticCacheRecord): {
+  decodedJson: string;
+  puzzle: SavedAcrosticPuzzle;
+} {
+  const decodedJson = decodeGzippedBase64(
+    record.acrostic,
+    "acrostic cache record",
+    "Unable to decode cached acrostic payload",
+  );
+  const puzzle = parseSavedAcrosticPuzzle(decodedJson);
+
+  return { decodedJson, puzzle };
 }
 
 export function normalizeInputDate(input: string): string {
@@ -170,6 +238,29 @@ export function getTodayInTimeZone(timeZone: string): string {
   return `${year}-${month}-${day}`;
 }
 
+function encodeGzippedBase64(value: string): string {
+  return gzipSync(Buffer.from(value, "utf8")).toString("base64");
+}
+
+function decodeGzippedBase64(
+  value: string,
+  label: string,
+  failurePrefix: string,
+): string {
+  const normalizedValue = value.trim();
+
+  if (!BASE64_PATTERN.test(normalizedValue)) {
+    throw new Error(`Invalid ${label}: expected a valid base64 payload.`);
+  }
+
+  try {
+    const compressed = Buffer.from(normalizedValue, "base64");
+    return gunzipSync(compressed).toString("utf8");
+  } catch (error) {
+    throw new Error(`${failurePrefix}: ${getErrorMessage(error)}`);
+  }
+}
+
 function parseJsonRecord(
   jsonText: string,
   label: string,
@@ -189,16 +280,75 @@ function parseJsonRecord(
   return parsed as Record<string, unknown>;
 }
 
+function readSavedPuzzleFields(
+  record: Record<string, unknown>,
+  label: string,
+): SavedAcrosticPuzzle {
+  return {
+    answerKey: readStringField(record, "answerKey", label),
+    clueData: readStringArrayField(record, "clueData", label),
+    clues: readStringArrayField(record, "clues", label),
+    cols: readIntegerField(record, "cols", label),
+    date: readStringField(record, "date", label),
+    fullQuote: readOptionalNullableStringField(record, "fullQuote", label),
+    gridLetters: readStringField(record, "gridLetters", label),
+    gridNumbers: readIntegerArrayField(record, "gridNumbers", label),
+    mapTitle: readIntegerArrayField(record, "mapTitle", label),
+    quote: readStringField(record, "quote", label),
+    rows: readIntegerField(record, "rows", label),
+  };
+}
+
+function normalizeCacheRecordDate(record: Record<string, unknown>): string {
+  const value = record.date;
+
+  if (typeof value !== "string") {
+    throw new Error(
+      "Invalid acrostic cache record: expected `date` to be a string.",
+    );
+  }
+
+  try {
+    return normalizeInputDate(value);
+  } catch (error) {
+    throw new Error(
+      `Invalid acrostic cache record: ${getErrorMessage(error)}`,
+    );
+  }
+}
+
+function readNonEmptyString(
+  record: Record<string, unknown>,
+  field: string,
+  label: string,
+): string {
+  const value = record[field];
+
+  if (typeof value !== "string" || value.trim() === "") {
+    throw new Error(
+      `Invalid ${label}: expected a non-empty string in \`${field}\`.`,
+    );
+  }
+
+  return value;
+}
+
 function readString(
   record: Record<string, unknown>,
   field: keyof XWordInfoPuzzle,
 ): string {
+  return readStringField(record, field, "decoded XWordInfo puzzle");
+}
+
+function readStringField(
+  record: Record<string, unknown>,
+  field: string,
+  label: string,
+): string {
   const value = record[field];
 
   if (typeof value !== "string") {
-    throw new Error(
-      `Invalid decoded XWordInfo puzzle: expected \`${field}\` to be a string.`,
-    );
+    throw new Error(`Invalid ${label}: expected \`${field}\` to be a string.`);
   }
 
   return value;
@@ -208,12 +358,18 @@ function readInteger(
   record: Record<string, unknown>,
   field: keyof XWordInfoPuzzle,
 ): number {
+  return readIntegerField(record, field, "decoded XWordInfo puzzle");
+}
+
+function readIntegerField(
+  record: Record<string, unknown>,
+  field: string,
+  label: string,
+): number {
   const value = record[field];
 
   if (typeof value !== "number" || !Number.isInteger(value)) {
-    throw new Error(
-      `Invalid decoded XWordInfo puzzle: expected \`${field}\` to be an integer.`,
-    );
+    throw new Error(`Invalid ${label}: expected \`${field}\` to be an integer.`);
   }
 
   return value;
@@ -223,11 +379,19 @@ function readStringArray(
   record: Record<string, unknown>,
   field: keyof XWordInfoPuzzle,
 ): string[] {
+  return readStringArrayField(record, field, "decoded XWordInfo puzzle");
+}
+
+function readStringArrayField(
+  record: Record<string, unknown>,
+  field: string,
+  label: string,
+): string[] {
   const value = record[field];
 
   if (!Array.isArray(value) || value.some((item) => typeof item !== "string")) {
     throw new Error(
-      `Invalid decoded XWordInfo puzzle: expected \`${field}\` to be an array of strings.`,
+      `Invalid ${label}: expected \`${field}\` to be an array of strings.`,
     );
   }
 
@@ -238,6 +402,14 @@ function readIntegerArray(
   record: Record<string, unknown>,
   field: keyof XWordInfoPuzzle,
 ): number[] {
+  return readIntegerArrayField(record, field, "decoded XWordInfo puzzle");
+}
+
+function readIntegerArrayField(
+  record: Record<string, unknown>,
+  field: string,
+  label: string,
+): number[] {
   const value = record[field];
 
   if (
@@ -245,7 +417,7 @@ function readIntegerArray(
     value.some((item) => typeof item !== "number" || !Number.isInteger(item))
   ) {
     throw new Error(
-      `Invalid decoded XWordInfo puzzle: expected \`${field}\` to be an array of integers.`,
+      `Invalid ${label}: expected \`${field}\` to be an array of integers.`,
     );
   }
 
@@ -256,6 +428,14 @@ function readOptionalNullableString(
   record: Record<string, unknown>,
   field: keyof XWordInfoPuzzle,
 ): string | null | undefined {
+  return readOptionalNullableStringField(record, field, "decoded XWordInfo puzzle");
+}
+
+function readOptionalNullableStringField(
+  record: Record<string, unknown>,
+  field: string,
+  label: string,
+): string | null | undefined {
   const value = record[field];
 
   if (value === undefined || value === null) {
@@ -264,7 +444,7 @@ function readOptionalNullableString(
 
   if (typeof value !== "string") {
     throw new Error(
-      `Invalid decoded XWordInfo puzzle: expected \`${field}\` to be a string, null, or omitted.`,
+      `Invalid ${label}: expected \`${field}\` to be a string, null, or omitted.`,
     );
   }
 

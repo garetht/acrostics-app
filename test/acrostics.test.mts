@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtemp, readFile } from "node:fs/promises";
+import { mkdtemp, readFile, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -7,13 +7,18 @@ import { gzipSync } from "node:zlib";
 
 import {
   buildAcrosticDataUrl,
+  createAcrosticCacheRecord,
+  decodeAcrosticCacheRecord,
   decodeWrappedPuzzleData,
   extractAvailableAcrosticDates,
   filterInclusiveDateRange,
   normalizeInputDate,
+  parseAcrosticCacheFile,
+  parseSavedAcrosticPuzzle,
   parseWrappedPuzzleResponse,
   parseXWordInfoPuzzle,
   parseXWordInfoPuzzleWrapper,
+  toSavedAcrosticPuzzle,
   XWORDINFO_ACROSTIC_ARCHIVE_URL,
   XWORDINFO_ACROSTIC_REFERRER,
 } from "../lib/xwordinfo/acrostics.mts";
@@ -97,6 +102,77 @@ test("parseWrappedPuzzleResponse returns the typed puzzle and decoded json", asy
   assert.equal(parsed.puzzle.date, "3/8/2026");
 });
 
+test("saved acrostic puzzles omit copyright but preserve other fields", async () => {
+  const livePuzzle = JSON.parse(await loadFixture("xwordinfo-puzzle.decoded.json"));
+  const savedPuzzle = toSavedAcrosticPuzzle(livePuzzle);
+
+  assert.equal("copyright" in savedPuzzle, false);
+  assert.deepEqual(
+    savedPuzzle,
+    parseSavedAcrosticPuzzle(JSON.stringify(livePuzzle)),
+  );
+  assert.throws(
+    () =>
+      parseSavedAcrosticPuzzle(
+        JSON.stringify({
+          ...savedPuzzle,
+          gridNumbers: [1, "2"],
+        }),
+      ),
+    /array of integers/i,
+  );
+});
+
+test("cache records round-trip through the committed line format", async () => {
+  const puzzle = JSON.parse(await loadFixture("xwordinfo-puzzle.decoded.json"));
+  const cacheText = [
+    JSON.stringify(
+      createAcrosticCacheRecord("2026-03-01", { ...puzzle, date: "3/1/2026" }),
+    ),
+    JSON.stringify(
+      createAcrosticCacheRecord("2026-03-08", { ...puzzle, date: "3/8/2026" }),
+    ),
+    "",
+  ].join("\n");
+
+  const records = parseAcrosticCacheFile(cacheText);
+
+  assert.deepEqual(records.map((record) => record.date), [
+    "2026-03-01",
+    "2026-03-08",
+  ]);
+  const decodedRecord = decodeAcrosticCacheRecord(records[1]);
+  assert.equal(decodedRecord.puzzle.date, "3/8/2026");
+  assert.equal("copyright" in decodedRecord.puzzle, false);
+  assert.equal(
+    "copyright" in JSON.parse(decodedRecord.decodedJson),
+    false,
+  );
+
+  assert.throws(
+    () =>
+      parseAcrosticCacheFile(
+        `${JSON.stringify(records[1])}\n${JSON.stringify(records[0])}\n`,
+      ),
+    /strictly increasing/i,
+  );
+});
+
+test("decodeAcrosticCacheRecord accepts older cached payloads with copyright", async () => {
+  const livePuzzle = JSON.parse(await loadFixture("xwordinfo-puzzle.decoded.json"));
+  const legacyRecord = {
+    date: "2026-03-08",
+    acrostic: gzipSync(Buffer.from(JSON.stringify(livePuzzle), "utf8")).toString(
+      "base64",
+    ),
+  };
+
+  const decoded = decodeAcrosticCacheRecord(legacyRecord);
+
+  assert.equal(decoded.puzzle.date, "3/8/2026");
+  assert.equal("copyright" in decoded.puzzle, false);
+});
+
 test("extractAvailableAcrosticDates deduplicates, sorts, and filters invalid dates", async () => {
   const archiveHtml = await loadFixture("acrostic-archive.html");
   const dates = extractAvailableAcrosticDates(archiveHtml);
@@ -108,7 +184,7 @@ test("extractAvailableAcrosticDates deduplicates, sorts, and filters invalid dat
   );
 });
 
-test("parseCliArgs validates mode flags and normalizes dates", () => {
+test("parseCliArgs validates mode flags, dates, and cache output", () => {
   assert.deepEqual(parseCliArgs([]), {
     mode: "all",
     outDir: "data/xwordinfo/acrostics",
@@ -123,10 +199,23 @@ test("parseCliArgs validates mode flags and normalizes dates", () => {
     since: "2026-03-01",
     outDir: "tmp",
   });
-  assert.deepEqual(parseCliArgs(["--out-dir", "tmp"]), {
+  assert.deepEqual(parseCliArgs(["--cache-file", "data/cache.ndjson"]), {
     mode: "all",
-    outDir: "tmp",
+    cacheFile: "data/cache.ndjson",
   });
+  assert.deepEqual(
+    parseCliArgs([
+      "--cache-file",
+      "data/cache.ndjson",
+      "--out-dir",
+      "tmp",
+    ]),
+    {
+      mode: "all",
+      cacheFile: "data/cache.ndjson",
+      outDir: "tmp",
+    },
+  );
   assert.throws(
     () => parseCliArgs(["--date", "2026-03-08", "--since", "2026-03-01"]),
     /at most one of --date or --since/i,
@@ -172,7 +261,42 @@ test("runFetchAcrostics writes one file in single-date mode", async () => {
   });
 
   const written = await readFile(path.join(outDir, "2026-03-08.json"), "utf8");
-  assert.equal(written, `${JSON.stringify(JSON.parse(puzzleJson), null, 2)}\n`);
+  const savedPuzzle = JSON.parse(written);
+  assert.equal(savedPuzzle.date, "3/8/2026");
+  assert.equal("copyright" in savedPuzzle, false);
+});
+
+test("runFetchAcrostics can materialize a single date from the cache file", async () => {
+  const tempDir = await mkdtemp(path.join(os.tmpdir(), "acrostics-cache-hit-"));
+  const outDir = path.join(tempDir, "out");
+  const cacheFile = path.join(tempDir, "acrostics.ndjson");
+  const puzzle = JSON.parse(await loadFixture("xwordinfo-puzzle.decoded.json"));
+
+  await writeFile(
+    cacheFile,
+    `${JSON.stringify(createAcrosticCacheRecord("2026-03-08", puzzle))}\n`,
+    "utf8",
+  );
+
+  let fetchCalls = 0;
+  const exitCode = await runFetchAcrostics(
+    ["--date", "2026-03-08", "--cache-file", cacheFile, "--out-dir", outDir],
+    {
+      fetchImpl: async () => {
+        fetchCalls += 1;
+        throw new Error("unexpected network fetch");
+      },
+      logger: createLogger(),
+    },
+  );
+
+  assert.equal(exitCode, 0);
+  assert.equal(fetchCalls, 0);
+  const savedPuzzle = JSON.parse(
+    await readFile(path.join(outDir, "2026-03-08.json"), "utf8"),
+  );
+  assert.equal(savedPuzzle.date, "3/8/2026");
+  assert.equal("copyright" in savedPuzzle, false);
 });
 
 test("runFetchAcrostics range mode fetches publish dates only", async () => {
@@ -213,18 +337,17 @@ test("runFetchAcrostics range mode fetches publish dates only", async () => {
     buildAcrosticDataUrl("2026-03-01"),
     buildAcrosticDataUrl("2026-03-08"),
   ]);
-  assert.equal(
-    normalizeInputDate("3/1/2026"),
-    "2026-03-01",
+  assert.equal(normalizeInputDate("3/1/2026"), "2026-03-01");
+  const marchFirstPuzzle = JSON.parse(
+    await readFile(path.join(outDir, "2026-03-01.json"), "utf8"),
   );
-  assert.equal(
-    JSON.parse(await readFile(path.join(outDir, "2026-03-01.json"), "utf8")).date,
-    "3/1/2026",
+  const marchEighthPuzzle = JSON.parse(
+    await readFile(path.join(outDir, "2026-03-08.json"), "utf8"),
   );
-  assert.equal(
-    JSON.parse(await readFile(path.join(outDir, "2026-03-08.json"), "utf8")).date,
-    "3/8/2026",
-  );
+  assert.equal(marchFirstPuzzle.date, "3/1/2026");
+  assert.equal(marchEighthPuzzle.date, "3/8/2026");
+  assert.equal("copyright" in marchFirstPuzzle, false);
+  assert.equal("copyright" in marchEighthPuzzle, false);
 });
 
 test("runFetchAcrostics with no args fetches the full published archive", async () => {
@@ -267,14 +390,72 @@ test("runFetchAcrostics with no args fetches the full published archive", async 
     buildAcrosticDataUrl("2026-03-01"),
     buildAcrosticDataUrl("2026-03-08"),
   ]);
-  assert.equal(
-    JSON.parse(await readFile(path.join(outDir, "2026-02-28.json"), "utf8")).date,
-    "2/28/2026",
+  const februaryPuzzle = JSON.parse(
+    await readFile(path.join(outDir, "2026-02-28.json"), "utf8"),
   );
-  assert.equal(
-    JSON.parse(await readFile(path.join(outDir, "2026-03-08.json"), "utf8")).date,
-    "3/8/2026",
+  const marchPuzzle = JSON.parse(
+    await readFile(path.join(outDir, "2026-03-08.json"), "utf8"),
   );
+  assert.equal(februaryPuzzle.date, "2/28/2026");
+  assert.equal(marchPuzzle.date, "3/8/2026");
+  assert.equal("copyright" in februaryPuzzle, false);
+  assert.equal("copyright" in marchPuzzle, false);
+});
+
+test("runFetchAcrostics cache mode appends only uncached newer dates", async () => {
+  const tempDir = await mkdtemp(path.join(os.tmpdir(), "acrostics-cache-mode-"));
+  const cacheFile = path.join(tempDir, "acrostics.ndjson");
+  const archiveHtml = await loadFixture("acrostic-archive.html");
+  const puzzle = JSON.parse(await loadFixture("xwordinfo-puzzle.decoded.json"));
+  const fetchCalls: string[] = [];
+
+  await writeFile(
+    cacheFile,
+    [
+      JSON.stringify(
+        createAcrosticCacheRecord("2026-02-28", { ...puzzle, date: "2/28/2026" }),
+      ),
+      JSON.stringify(
+        createAcrosticCacheRecord("2026-03-01", { ...puzzle, date: "3/1/2026" }),
+      ),
+      "",
+    ].join("\n"),
+    "utf8",
+  );
+
+  const exitCode = await runFetchAcrostics(["--cache-file", cacheFile], {
+    today: "2026-03-08",
+    fetchImpl: async (input) => {
+      const url = String(input);
+      fetchCalls.push(url);
+
+      if (url === XWORDINFO_ACROSTIC_ARCHIVE_URL) {
+        return response(200, archiveHtml);
+      }
+
+      if (url === buildAcrosticDataUrl("2026-03-08")) {
+        return response(200, wrapPuzzle({ ...puzzle, date: "3/8/2026" }));
+      }
+
+      throw new Error(`Unexpected URL ${url}`);
+    },
+    logger: createLogger(),
+  });
+
+  assert.equal(exitCode, 0);
+  assert.deepEqual(fetchCalls, [
+    XWORDINFO_ACROSTIC_ARCHIVE_URL,
+    buildAcrosticDataUrl("2026-03-08"),
+  ]);
+
+  const cacheRecords = parseAcrosticCacheFile(await readFile(cacheFile, "utf8"));
+  assert.deepEqual(
+    cacheRecords.map((record) => record.date),
+    ["2026-02-28", "2026-03-01", "2026-03-08"],
+  );
+  const decodedNewestRecord = decodeAcrosticCacheRecord(cacheRecords[2]);
+  assert.equal(decodedNewestRecord.puzzle.date, "3/8/2026");
+  assert.equal("copyright" in decodedNewestRecord.puzzle, false);
 });
 
 test("runFetchAcrostics range mode continues after failures and exits non-zero", async () => {
@@ -314,14 +495,16 @@ test("runFetchAcrostics range mode continues after failures and exits non-zero",
     buildAcrosticDataUrl("2026-03-01"),
     buildAcrosticDataUrl("2026-03-08"),
   ]);
-  assert.equal(
-    JSON.parse(await readFile(path.join(outDir, "2026-02-28.json"), "utf8")).date,
-    "2/28/2026",
+  const februaryPuzzle = JSON.parse(
+    await readFile(path.join(outDir, "2026-02-28.json"), "utf8"),
   );
-  assert.equal(
-    JSON.parse(await readFile(path.join(outDir, "2026-03-08.json"), "utf8")).date,
-    "3/8/2026",
+  const marchPuzzle = JSON.parse(
+    await readFile(path.join(outDir, "2026-03-08.json"), "utf8"),
   );
+  assert.equal(februaryPuzzle.date, "2/28/2026");
+  assert.equal(marchPuzzle.date, "3/8/2026");
+  assert.equal("copyright" in februaryPuzzle, false);
+  assert.equal("copyright" in marchPuzzle, false);
   await assert.rejects(
     readFile(path.join(outDir, "2026-03-01.json"), "utf8"),
     /ENOENT/i,

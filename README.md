@@ -22,13 +22,27 @@ Open [http://localhost:3000](http://localhost:3000).
 
 The fetcher lives in [`scripts/fetch-acrostics.mts`](./scripts/fetch-acrostics.mts) and runs with Node's type-stripping support.
 
-### Fetch the Full Archive
+### Fetch the Full Archive to Per-Date JSON Files
 
 ```bash
 npm run fetch:acrostics
 ```
 
-With no arguments, the CLI fetches every published acrostic date in the archive through today in `America/New_York`.
+With no arguments, the CLI fetches every published acrostic date in the archive through today in `America/New_York` and writes one decoded file per date to `data/xwordinfo/acrostics`.
+
+### Fetch Into the Repository Cache File
+
+```bash
+npm run fetch:acrostics:cache
+```
+
+This writes newline-delimited JSON records to `data/xwordinfo/acrostics.ndjson` in the repository:
+
+```json
+{"date":"2026-03-08","acrostic":"<base64 gzipped decoded puzzle json>"}
+```
+
+The cache file is append-only and date-ordered. When it already contains data, the fetcher reads the last line and only requests dates after that cached date.
 
 ### Fetch a Single Date
 
@@ -49,25 +63,27 @@ npm run fetch:acrostics -- --since 2026-01-01
 
 Range mode does not walk every calendar day. It first loads the XWord Info acrostic archive page, extracts the actual publication dates, filters them to the requested window, and then fetches each available puzzle date through today in `America/New_York`.
 
-### Write to a Custom Directory
+### Select Output Targets Explicitly
+
+Write only the committed cache file:
+
+```bash
+npm run fetch:acrostics -- --cache-file data/xwordinfo/acrostics.ndjson
+```
+
+Write only per-date JSON files to a custom directory:
 
 ```bash
 npm run fetch:acrostics -- --out-dir tmp/acrostics
 ```
 
-or:
+Write both outputs in the same run:
 
 ```bash
-npm run fetch:acrostics -- --since 2026-01-01 --out-dir tmp/acrostics
+npm run fetch:acrostics -- --since 2026-01-01 --out-dir tmp/acrostics --cache-file data/xwordinfo/acrostics.ndjson
 ```
 
-Default output directory:
-
-```text
-data/xwordinfo/acrostics
-```
-
-Each successful fetch writes one decoded JSON file named `YYYY-MM-DD.json`.
+If `--cache-file` is supplied for `--date`, the CLI first checks the committed cache file for that date. A cache hit can materialize the per-date JSON file without making a network request.
 
 ## Response Decoding and Typing
 
@@ -85,44 +101,20 @@ The fetcher:
 2. Base64-decodes `data`.
 3. Gunzips the payload.
 4. Parses the decoded JSON into typed models.
-5. Validates the required fields before writing the file.
+5. Validates the required fields before writing the file or cache record.
 
 The typed models and parsing helpers live in [`lib/xwordinfo/acrostics.mts`](./lib/xwordinfo/acrostics.mts).
 
-### Typed Models
-
-```ts
-type XWordInfoPuzzleWrapper = {
-  data: string;
-};
-
-type XWordInfoPuzzle = {
-  answerKey: string;
-  clueData: string[];
-  clues: string[];
-  cols: number;
-  copyright: string;
-  date: string;
-  fullQuote?: string | null;
-  gridLetters: string;
-  gridNumbers: number[];
-  mapTitle: number[];
-  quote: string;
-  rows: number;
-};
-```
-
-Unknown extra fields in the decoded payload are ignored. Required known fields are validated strictly, except `fullQuote`, which is nullable or absent for some historical puzzles.
-
 ## CLI Behavior
 
-- With no arguments, the CLI fetches the full published archive.
-- `--out-dir` can be used by itself or alongside `--date` / `--since`.
+- With no arguments, the CLI fetches the full published archive into per-date JSON files.
+- `--out-dir` and `--cache-file` can be used independently or together.
 - `--date` and `--since` are mutually exclusive.
 - Invalid dates fail fast with a clear error.
 - Range mode fetches dates sequentially.
 - If one date fails in range mode, later dates still run.
 - Range mode exits non-zero if any dates fail and prints a failure summary.
+- Cache-file mode assumes records are sorted by ascending date with exactly one line per date.
 
 ## Testing
 
@@ -132,15 +124,7 @@ Run the targeted fetcher test suite with:
 npm run test:acrostics
 ```
 
-The tests cover:
-
-- wrapper parsing
-- base64 + gzip decoding
-- typed puzzle validation
-- archive date extraction and filtering
-- CLI argument validation
-- single-date and range fetch orchestration
-- partial-failure handling in range mode
+The tests cover wrapper parsing, base64 and gzip decoding, typed puzzle validation, archive date extraction, CLI argument validation, per-file output, cache-file output, cache hits, and partial-failure handling.
 
 ## Notes
 
