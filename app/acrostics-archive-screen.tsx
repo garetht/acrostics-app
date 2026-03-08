@@ -10,6 +10,10 @@ import {
 } from "@/lib/acrostics-progress";
 import type { XWordInfoPuzzle } from "./acrostic";
 import { AcrosticPuzzleScreen } from "./acrostic-puzzle-screen";
+import {
+  buildArchiveSections,
+  formatArchiveDate,
+} from "./acrostics-archive-screen.helpers";
 
 export type AcrosticsArchiveScreenProps = {
   availableDates: readonly string[];
@@ -18,38 +22,6 @@ export type AcrosticsArchiveScreenProps = {
   puzzle: XWordInfoPuzzle;
   selectedDate: string;
 };
-
-function formatArchiveDate(date: string) {
-  const [yearText, monthText, dayText] = date.split("-");
-  const year = Number.parseInt(yearText, 10);
-  const month = Number.parseInt(monthText, 10);
-  const day = Number.parseInt(dayText, 10);
-
-  return new Intl.DateTimeFormat("en-US", {
-    day: "numeric",
-    month: "short",
-    timeZone: "UTC",
-    weekday: "short",
-  }).format(new Date(Date.UTC(year, month - 1, day)));
-}
-
-function buildArchiveSections(availableDates: readonly string[]) {
-  const sections: Array<{ dates: string[]; year: string }> = [];
-
-  for (const date of [...availableDates].reverse()) {
-    const year = date.slice(0, 4);
-    const currentSection = sections.at(-1);
-
-    if (!currentSection || currentSection.year !== year) {
-      sections.push({ dates: [date], year });
-      continue;
-    }
-
-    currentSection.dates.push(date);
-  }
-
-  return sections;
-}
 
 function getProgressBadgeClass(kind: "not_started" | "in_progress" | "completed") {
   if (kind === "completed") {
