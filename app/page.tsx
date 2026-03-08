@@ -1,25 +1,20 @@
-import { getBundledAcrosticSelection, readDateSearchParam } from "@/lib/acrostics-archive";
-import { AcrosticsArchiveScreen } from "./acrostics-archive-screen";
+import { Suspense } from "react";
 
-type SearchParams = Record<string, string | string[] | undefined>;
+import { AcrosticsArchiveRoute } from "./acrostics-archive-route";
+import { RouteStatusScreen } from "./route-status-screen";
 
-type HomeProps = {
-  searchParams?: Promise<SearchParams>;
-};
-
-export default async function Home({ searchParams }: HomeProps) {
-  const resolvedSearchParams = ((await searchParams) ?? {}) as SearchParams;
-  const requestedDate = readDateSearchParam(resolvedSearchParams.date);
-  const { availableDates, cellCountByDate, latestDate, puzzle, selectedDate } =
-    getBundledAcrosticSelection(requestedDate);
-
+export default function Home() {
   return (
-    <AcrosticsArchiveScreen
-      availableDates={availableDates}
-      cellCountByDate={cellCountByDate}
-      latestDate={latestDate}
-      puzzle={puzzle}
-      selectedDate={selectedDate}
-    />
+    <Suspense
+      fallback={
+        <RouteStatusScreen
+          body="Loading the archived acrostics and your selected puzzle."
+          eyebrow="Archive"
+          title="Loading acrostics"
+        />
+      }
+    >
+      <AcrosticsArchiveRoute />
+    </Suspense>
   );
 }

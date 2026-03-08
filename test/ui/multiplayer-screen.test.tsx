@@ -42,7 +42,6 @@ describe("MultiplayerScreen", () => {
   beforeEach(() => {
     boardState.props = null;
     resetFakeMultiplayerRuntime();
-    vi.useFakeTimers();
   });
 
   it("restores stored host sessions and exposes the invite controls", async () => {
@@ -80,6 +79,7 @@ describe("MultiplayerScreen", () => {
   });
 
   it("keeps guests read-only until connected and applies inbound state and presence updates", async () => {
+    vi.useFakeTimers();
     queueRandomUUIDs("guest-client");
 
     render(
@@ -226,7 +226,7 @@ describe("MultiplayerScreen", () => {
     fireEvent.click(await screen.findByRole("button", { name: "Copy invite link" }));
     expect(await screen.findByRole("button", { name: "Invite copied" })).toBeInTheDocument();
     expect(getClipboardWrites()).toEqual([
-      `${window.location.origin}/multiplayer?date=2026-03-08&session=host-session`,
+      `${window.location.origin}/multiplayer/?date=2026-03-08&session=host-session`,
     ]);
 
     rejectNextClipboardWrite();
@@ -266,6 +266,7 @@ describe("MultiplayerScreen", () => {
 
     act(() => {
       connection = peer?.emitIncomingConnection();
+      connection?.emitOpen();
     });
 
     act(() => {

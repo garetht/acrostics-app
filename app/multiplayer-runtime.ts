@@ -56,7 +56,7 @@ export const multiplayerRuntime: MultiplayerRuntime = {
     }
   },
   createPeer(id) {
-    return new Peer(id) as unknown as MultiplayerPeer;
+    return (id ? new Peer(id) : new Peer()) as unknown as MultiplayerPeer;
   },
   randomUUID() {
     return crypto.randomUUID();

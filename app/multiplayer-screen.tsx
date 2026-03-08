@@ -102,6 +102,7 @@ export function MultiplayerScreen({
   const boardEntries = sessionRecord ? toBoardEntries(sessionRecord.entriesByNumber) : {};
   const inviteUrl = buildInviteUrl(sessionId, selectedDate);
   const isGuestReadOnly = role === "guest" && phase !== "connected";
+  const hasTerminalError = phase === "rejected" || phase === "error";
 
   function clearReconnectTimer() {
     multiplayerRuntime.clearTimeout(reconnectTimerRef.current);
@@ -613,9 +614,11 @@ export function MultiplayerScreen({
               <p className="mt-3 max-w-3xl text-sm leading-6 text-[color:var(--muted)]">
                 {normalized.meta.quote}
               </p>
-              <p className="mt-4 text-sm font-semibold text-[color:var(--remote-ink)]">
-                {statusMessage}
-              </p>
+              {!hasTerminalError ? (
+                <p className="mt-4 text-sm font-semibold text-[color:var(--remote-ink)]">
+                  {statusMessage}
+                </p>
+              ) : null}
             </div>
 
             <div className="flex flex-col gap-4 xl:items-end">
@@ -668,7 +671,7 @@ export function MultiplayerScreen({
           </div>
         </header>
 
-        {phase === "rejected" || phase === "error" ? (
+        {hasTerminalError ? (
           <section className="rounded-[2rem] border border-[color:var(--danger)] bg-[color:var(--danger-soft)] p-5 shadow-[0_18px_40px_-30px_rgba(92,31,23,0.42)]">
             <p className="text-sm font-semibold uppercase tracking-[0.28em] text-[color:var(--danger-ink)]">
               Multiplayer unavailable

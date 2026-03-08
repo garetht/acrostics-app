@@ -44,8 +44,8 @@ describe("AcrosticPuzzleScreen", () => {
         updatedAt: "2026-03-08T12:00:00.000Z",
       },
     });
-    const getItemSpy = vi.spyOn(window.localStorage, "getItem");
-    const setItemSpy = vi.spyOn(window.localStorage, "setItem");
+    const getItemSpy = vi.spyOn(Storage.prototype, "getItem");
+    const setItemSpy = vi.spyOn(Storage.prototype, "setItem");
 
     render(
       <AcrosticPuzzleScreen

@@ -1,5 +1,8 @@
+import { act } from "@testing-library/react";
 import { vi } from "vitest";
 
 export async function flushTimers() {
-  await vi.runOnlyPendingTimersAsync();
+  await act(async () => {
+    await vi.runOnlyPendingTimersAsync();
+  });
 }

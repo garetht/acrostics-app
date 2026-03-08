@@ -1,5 +1,15 @@
 import { gunzipSync, gzipSync } from "node:zlib";
 
+import {
+  normalizeInputDate,
+  parseSavedAcrosticPuzzle,
+  type SavedAcrosticPuzzle,
+  type XWordInfoPuzzle,
+} from "../acrostics-data.ts";
+
+export { normalizeInputDate, parseSavedAcrosticPuzzle };
+export type { SavedAcrosticPuzzle, XWordInfoPuzzle };
+
 export const XWORDINFO_ACROSTIC_ARCHIVE_URL =
   "https://www.xwordinfo.com/SelectAcrostic";
 export const XWORDINFO_ACROSTIC_DATA_URL =
@@ -12,38 +22,13 @@ export type XWordInfoPuzzleWrapper = {
   data: string;
 };
 
-export type XWordInfoPuzzle = {
-  answerKey: string;
-  clueData: string[];
-  clues: string[];
-  cols: number;
-  copyright: string;
-  date: string;
-  fullQuote?: string | null;
-  gridLetters: string;
-  gridNumbers: number[];
-  mapTitle: number[];
-  quote: string;
-  rows: number;
-};
-
-export type SavedAcrosticPuzzle = Omit<XWordInfoPuzzle, "copyright">;
-
 export type AcrosticCacheRecord = {
   date: string;
   acrostic: string;
 };
 
-type DateParts = {
-  year: number;
-  month: number;
-  day: number;
-};
-
 const BASE64_PATTERN =
   /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/;
-const ISO_DATE_PATTERN = /^(\d{4})-(\d{2})-(\d{2})$/;
-const SLASH_DATE_PATTERN = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/;
 const ARCHIVE_DATE_PATTERN = /\b(\d{1,2})\/(\d{1,2})\/(\d{4})\b/g;
 
 export function parseXWordInfoPuzzleWrapper(
@@ -89,13 +74,9 @@ export function parseWrappedPuzzleResponse(jsonText: string): {
 export function toSavedAcrosticPuzzle(
   puzzle: XWordInfoPuzzle,
 ): SavedAcrosticPuzzle {
-  const { copyright: _copyright, ...savedPuzzle } = puzzle;
+  const { copyright, ...savedPuzzle } = puzzle;
+  void copyright;
   return savedPuzzle;
-}
-
-export function parseSavedAcrosticPuzzle(jsonText: string): SavedAcrosticPuzzle {
-  const record = parseJsonRecord(jsonText, "saved acrostic puzzle");
-  return readSavedPuzzleFields(record, "saved acrostic puzzle");
 }
 
 export function createAcrosticCacheRecord(
@@ -182,14 +163,9 @@ export function decodeAcrosticCacheRecord(record: AcrosticCacheRecord): {
   return { decodedJson, puzzle };
 }
 
-export function normalizeInputDate(input: string): string {
-  const { year, month, day } = parseDateParts(input);
-  return `${String(year).padStart(4, "0")}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
-}
-
 export function formatEndpointDate(input: string): string {
-  const { year, month, day } = parseDateParts(input);
-  return `${month}/${day}/${year}`;
+  const [year, month, day] = normalizeInputDate(input).split("-");
+  return `${Number.parseInt(month, 10)}/${Number.parseInt(day, 10)}/${Number.parseInt(year, 10)}`;
 }
 
 export function buildAcrosticDataUrl(input: string): string {
@@ -391,13 +367,6 @@ function readStringField(
   return value;
 }
 
-function readInteger(
-  record: Record<string, unknown>,
-  field: keyof XWordInfoPuzzle,
-): number {
-  return readIntegerField(record, field, "decoded XWordInfo puzzle");
-}
-
 function readIntegerField(
   record: Record<string, unknown>,
   field: string,
@@ -410,13 +379,6 @@ function readIntegerField(
   }
 
   return value;
-}
-
-function readStringArray(
-  record: Record<string, unknown>,
-  field: keyof XWordInfoPuzzle,
-): string[] {
-  return readStringArrayField(record, field, "decoded XWordInfo puzzle");
 }
 
 function readStringArrayField(
@@ -433,13 +395,6 @@ function readStringArrayField(
   }
 
   return [...value];
-}
-
-function readIntegerArray(
-  record: Record<string, unknown>,
-  field: keyof XWordInfoPuzzle,
-): number[] {
-  return readIntegerArrayField(record, field, "decoded XWordInfo puzzle");
 }
 
 function readIntegerArrayField(
@@ -461,13 +416,6 @@ function readIntegerArrayField(
   return [...value];
 }
 
-function readOptionalNullableString(
-  record: Record<string, unknown>,
-  field: keyof XWordInfoPuzzle,
-): string | null | undefined {
-  return readOptionalNullableStringField(record, field, "decoded XWordInfo puzzle");
-}
-
 function readOptionalNullableStringField(
   record: Record<string, unknown>,
   field: string,
@@ -486,80 +434,6 @@ function readOptionalNullableStringField(
   }
 
   return value;
-}
-
-function parseDateParts(input: string): DateParts {
-  const value = input.trim();
-  const isoMatch = ISO_DATE_PATTERN.exec(value);
-
-  if (isoMatch) {
-    const [, yearText, monthText, dayText] = isoMatch;
-    return validateDateParts(
-      Number.parseInt(yearText, 10),
-      Number.parseInt(monthText, 10),
-      Number.parseInt(dayText, 10),
-      input,
-    );
-  }
-
-  const slashMatch = SLASH_DATE_PATTERN.exec(value);
-
-  if (slashMatch) {
-    const [, monthText, dayText, yearText] = slashMatch;
-    return validateDateParts(
-      Number.parseInt(yearText, 10),
-      Number.parseInt(monthText, 10),
-      Number.parseInt(dayText, 10),
-      input,
-    );
-  }
-
-  throw new Error(
-    `Invalid date "${input}". Expected YYYY-MM-DD or M/D/YYYY format.`,
-  );
-}
-
-function validateDateParts(
-  year: number,
-  month: number,
-  day: number,
-  originalInput: string,
-): DateParts {
-  if (!Number.isInteger(year) || year < 1) {
-    throw new Error(`Invalid date "${originalInput}": invalid year.`);
-  }
-
-  if (!Number.isInteger(month) || month < 1 || month > 12) {
-    throw new Error(`Invalid date "${originalInput}": invalid month.`);
-  }
-
-  if (!Number.isInteger(day) || day < 1 || day > daysInMonth(year, month)) {
-    throw new Error(`Invalid date "${originalInput}": invalid day.`);
-  }
-
-  return { year, month, day };
-}
-
-function daysInMonth(year: number, month: number): number {
-  const thirtyDayMonths = new Set([4, 6, 9, 11]);
-
-  if (month === 2) {
-    return isLeapYear(year) ? 29 : 28;
-  }
-
-  return thirtyDayMonths.has(month) ? 30 : 31;
-}
-
-function isLeapYear(year: number): boolean {
-  if (year % 400 === 0) {
-    return true;
-  }
-
-  if (year % 100 === 0) {
-    return false;
-  }
-
-  return year % 4 === 0;
 }
 
 function getErrorMessage(error: unknown): string {

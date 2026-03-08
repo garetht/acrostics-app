@@ -1,12 +1,10 @@
-export function buildInviteUrl(sessionId: string, date: string) {
-  if (typeof window === "undefined") {
-    return `/multiplayer?date=${encodeURIComponent(date)}&session=${encodeURIComponent(sessionId)}`;
-  }
+import { buildUrlWithBasePath } from "@/lib/site-paths";
 
-  const url = new URL("/multiplayer", window.location.origin);
-  url.searchParams.set("date", date);
-  url.searchParams.set("session", sessionId);
-  return url.toString();
+export function buildInviteUrl(sessionId: string, date: string) {
+  return buildUrlWithBasePath("/multiplayer/", {
+    date,
+    session: sessionId,
+  });
 }
 
 export function getPeerErrorMessage(error: unknown) {

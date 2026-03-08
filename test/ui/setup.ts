@@ -9,14 +9,18 @@ vi.mock("next/link", () => ({
   default: ({
     children,
     href,
-    prefetch: _prefetch,
-    scroll: _scroll,
+    prefetch,
+    scroll,
     ...props
     }: React.AnchorHTMLAttributes<HTMLAnchorElement> & {
     href: string;
     prefetch?: boolean;
     scroll?: boolean;
-  }) => React.createElement("a", { href, ...props }, children),
+  }) => {
+    void prefetch;
+    void scroll;
+    return React.createElement("a", { href, ...props }, children);
+  },
 }));
 
 vi.mock("next/navigation", () => import("./mocks/next-navigation"));

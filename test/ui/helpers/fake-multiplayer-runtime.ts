@@ -72,7 +72,9 @@ export class FakeConnection {
     event: TEvent,
     handler: ConnectionHandlers[TEvent][number],
   ) {
-    this.handlers[event].push(handler);
+    (
+      this.handlers[event] as Array<ConnectionHandlers[TEvent][number]>
+    ).push(handler);
   }
 
   send(message: MultiplayerMessage) {
@@ -95,7 +97,8 @@ export class FakePeer {
     this.id = id;
   }
 
-  connect(peerId: string, _options?: { reliable?: boolean }) {
+  connect(peerId: string, options?: { reliable?: boolean }) {
+    void options;
     const connection = new FakeConnection(peerId);
     this.outboundConnections.push(connection);
     return connection;
@@ -142,7 +145,7 @@ export class FakePeer {
     event: TEvent,
     handler: PeerHandlers[TEvent][number],
   ) {
-    this.handlers[event].push(handler);
+    (this.handlers[event] as Array<PeerHandlers[TEvent][number]>).push(handler);
   }
 }
 
