@@ -397,6 +397,55 @@ test("runFetchAcrostics with no args fetches the full published archive", async 
   assert.equal("copyright" in marchPuzzle, false);
 });
 
+test("runFetchAcrostics with no args includes archive dates up to one week ahead", async () => {
+  const outDir = await mkdtemp(path.join(os.tmpdir(), "acrostics-all-offset-"));
+  const archiveHtml = [
+    '<html><body><a href="/Acrostic?date=3/8/2026">Mar 8</a>',
+    '<a href="/Acrostic?date=3/15/2026">Mar 15</a>',
+    '<a href="/Acrostic?date=3/16/2026">Mar 16</a></body></html>',
+  ].join("");
+  const fixturePuzzle = JSON.parse(await loadFixture("xwordinfo-puzzle.decoded.json"));
+  const fetchCalls: string[] = [];
+
+  const exitCode = await runFetchAcrostics(["--out-dir", outDir], {
+    today: "2026-03-08",
+    fetchImpl: async (input) => {
+      const url = String(input);
+      fetchCalls.push(url);
+
+      if (url === XWORDINFO_ACROSTIC_ARCHIVE_URL) {
+        return response(200, archiveHtml);
+      }
+
+      if (url === buildAcrosticDataUrl("2026-03-08")) {
+        return response(200, wrapPuzzle({ ...fixturePuzzle, date: "3/8/2026" }));
+      }
+
+      if (url === buildAcrosticDataUrl("2026-03-15")) {
+        return response(200, wrapPuzzle({ ...fixturePuzzle, date: "3/15/2026" }));
+      }
+
+      throw new Error(`Unexpected URL ${url}`);
+    },
+    logger: createLogger(),
+  });
+
+  assert.equal(exitCode, 0);
+  assert.deepEqual(fetchCalls, [
+    XWORDINFO_ACROSTIC_ARCHIVE_URL,
+    buildAcrosticDataUrl("2026-03-08"),
+    buildAcrosticDataUrl("2026-03-15"),
+  ]);
+  const marchFifteenthPuzzle = JSON.parse(
+    await readFile(path.join(outDir, "2026-03-15.json"), "utf8"),
+  );
+  assert.equal(marchFifteenthPuzzle.date, "3/15/2026");
+  await assert.rejects(
+    readFile(path.join(outDir, "2026-03-16.json"), "utf8"),
+    /ENOENT/,
+  );
+});
+
 test("runFetchAcrostics cache mode rewrites the gzipped cache with only new dates", async () => {
   const tempDir = await mkdtemp(path.join(os.tmpdir(), "acrostics-cache-mode-"));
   const cacheFile = path.join(tempDir, "acrostics.json.gz");
