@@ -9,6 +9,7 @@
     "lint": "eslint",
     "test": "npm run lint && npm run test:acrostics && npm run build",
     "fetch:acrostics": "node --experimental-strip-types scripts/fetch-acrostics.mts",
+    "fetch:acrostics:cache": "node --experimental-strip-types scripts/fetch-acrostics.mts --cache-file data/xwordinfo/acrostics.json.gz",
     "test:acrostics": "node --experimental-strip-types --test test/**/*.test.mts"
   },
   "dependencies": {
