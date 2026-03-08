@@ -1,36 +1,148 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Acrostics App
 
-## Getting Started
+This repository contains a Next.js app plus a typed Node/TypeScript CLI for fetching and decoding XWord Info acrostic data.
 
-First, run the development server:
+## Requirements
+
+- Node.js 24+
+- npm
+
+## App Development
+
+Install dependencies and start the app:
 
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Acrostic Fetch CLI
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+The fetcher lives in [`scripts/fetch-acrostics.mts`](./scripts/fetch-acrostics.mts) and runs with Node's type-stripping support.
 
-## Learn More
+### Fetch the Full Archive
 
-To learn more about Next.js, take a look at the following resources:
+```bash
+npm run fetch:acrostics
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+With no arguments, the CLI fetches every published acrostic date in the archive through today in `America/New_York`.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+### Fetch a Single Date
 
-## Deploy on Vercel
+```bash
+npm run fetch:acrostics -- --date 2026-03-08
+```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+Accepted date formats:
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- `YYYY-MM-DD`
+- `M/D/YYYY`
+
+### Fetch All Published Dates Since a Start Date
+
+```bash
+npm run fetch:acrostics -- --since 2026-01-01
+```
+
+Range mode does not walk every calendar day. It first loads the XWord Info acrostic archive page, extracts the actual publication dates, filters them to the requested window, and then fetches each available puzzle date through today in `America/New_York`.
+
+### Write to a Custom Directory
+
+```bash
+npm run fetch:acrostics -- --out-dir tmp/acrostics
+```
+
+or:
+
+```bash
+npm run fetch:acrostics -- --since 2026-01-01 --out-dir tmp/acrostics
+```
+
+Default output directory:
+
+```text
+data/xwordinfo/acrostics
+```
+
+Each successful fetch writes one decoded JSON file named `YYYY-MM-DD.json`.
+
+## Response Decoding and Typing
+
+The XWord Info endpoint returns JSON shaped like:
+
+```json
+{
+  "data": "<base64 gzipped json>"
+}
+```
+
+The fetcher:
+
+1. Parses the wrapper object.
+2. Base64-decodes `data`.
+3. Gunzips the payload.
+4. Parses the decoded JSON into typed models.
+5. Validates the required fields before writing the file.
+
+The typed models and parsing helpers live in [`lib/xwordinfo/acrostics.mts`](./lib/xwordinfo/acrostics.mts).
+
+### Typed Models
+
+```ts
+type XWordInfoPuzzleWrapper = {
+  data: string;
+};
+
+type XWordInfoPuzzle = {
+  answerKey: string;
+  clueData: string[];
+  clues: string[];
+  cols: number;
+  copyright: string;
+  date: string;
+  fullQuote?: string | null;
+  gridLetters: string;
+  gridNumbers: number[];
+  mapTitle: number[];
+  quote: string;
+  rows: number;
+};
+```
+
+Unknown extra fields in the decoded payload are ignored. Required known fields are validated strictly, except `fullQuote`, which is nullable or absent for some historical puzzles.
+
+## CLI Behavior
+
+- With no arguments, the CLI fetches the full published archive.
+- `--out-dir` can be used by itself or alongside `--date` / `--since`.
+- `--date` and `--since` are mutually exclusive.
+- Invalid dates fail fast with a clear error.
+- Range mode fetches dates sequentially.
+- If one date fails in range mode, later dates still run.
+- Range mode exits non-zero if any dates fail and prints a failure summary.
+
+## Testing
+
+Run the targeted fetcher test suite with:
+
+```bash
+npm run test:acrostics
+```
+
+The tests cover:
+
+- wrapper parsing
+- base64 + gzip decoding
+- typed puzzle validation
+- archive date extraction and filtering
+- CLI argument validation
+- single-date and range fetch orchestration
+- partial-failure handling in range mode
+
+## Notes
+
+- Live fetches require network access to `www.xwordinfo.com`.
+- The CLI is dependency-free beyond the repo's existing Node/TypeScript toolchain.
