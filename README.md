@@ -18,6 +18,27 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000).
 
+## GitHub Pages Deployment
+
+The app is configured for static export so it can be published to GitHub Pages without an app server:
+
+```bash
+npm install
+npm run build
+```
+
+The production build writes the exported site to `out/`.
+
+For project-site deployments under a repository subpath, set `NEXT_PUBLIC_BASE_PATH` at build time. Example:
+
+```bash
+NEXT_PUBLIC_BASE_PATH=/acrostics-app npm run build
+```
+
+The build also generates browser-fetchable archive assets in `public/acrostics` before export. Those files are derived from the committed cache and are not meant to be edited by hand.
+
+Multiplayer still depends on external PeerJS/WebRTC signaling; GitHub Pages only hosts the static frontend.
+
 ## Acrostic Fetch CLI
 
 The fetcher lives in [`scripts/fetch-acrostics.mts`](./scripts/fetch-acrostics.mts) and runs with Node's type-stripping support.

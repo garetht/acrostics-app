@@ -1,4 +1,4 @@
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 
@@ -14,6 +14,11 @@ export type BundledAcrosticArchive = {
   latestDate: string;
   payloadByDate: Record<string, string>;
 };
+
+export type AcrosticArchiveStaticManifest = Omit<
+  BundledAcrosticArchive,
+  "payloadByDate"
+>;
 
 export function buildBundledAcrosticsArchive(
   records: readonly AcrosticCacheRecord[],
@@ -63,9 +68,54 @@ export const bundledAcrosticArchive: BundledAcrosticArchive = {
 `;
 }
 
+export function buildAcrosticArchiveStaticManifest(
+  archive: BundledAcrosticArchive,
+): AcrosticArchiveStaticManifest {
+  return {
+    availableDates: archive.availableDates,
+    cellCountByDate: archive.cellCountByDate,
+    latestDate: archive.latestDate,
+  };
+}
+
+export function renderAcrosticArchiveStaticManifestJson(
+  manifest: AcrosticArchiveStaticManifest,
+): string {
+  return JSON.stringify(manifest);
+}
+
+export async function writeBundledAcrosticStaticAssets(
+  records: readonly AcrosticCacheRecord[],
+  outputDir: string,
+): Promise<void> {
+  const archive = buildBundledAcrosticsArchive(records);
+  const manifest = buildAcrosticArchiveStaticManifest(archive);
+  const normalizedOutputDir = path.resolve(outputDir);
+  const puzzlesDir = path.join(normalizedOutputDir, "puzzles");
+
+  await mkdir(normalizedOutputDir, { recursive: true });
+  await rm(puzzlesDir, { force: true, recursive: true });
+  await mkdir(puzzlesDir, { recursive: true });
+  await writeFile(
+    path.join(normalizedOutputDir, "manifest.json"),
+    renderAcrosticArchiveStaticManifestJson(manifest),
+    "utf8",
+  );
+
+  await Promise.all(
+    records.map(async (record) => {
+      const { puzzle } = decodeAcrosticCacheRecord(record);
+      const outputFile = path.join(puzzlesDir, `${record.date}.json`);
+
+      await writeFile(outputFile, JSON.stringify(puzzle), "utf8");
+    }),
+  );
+}
+
 export async function generateBundledAcrosticsArchive(options?: {
   inputFile?: string;
   outputFile?: string;
+  staticAssetDir?: string;
 }): Promise<void> {
   const inputFile = path.resolve(
     options?.inputFile ?? "data/xwordinfo/acrostics.json.gz",
@@ -80,6 +130,10 @@ export async function generateBundledAcrosticsArchive(options?: {
 
   await mkdir(path.dirname(outputFile), { recursive: true });
   await writeFile(outputFile, output, "utf8");
+  await writeBundledAcrosticStaticAssets(
+    records,
+    options?.staticAssetDir ?? "public/acrostics",
+  );
 }
 
 async function main() {

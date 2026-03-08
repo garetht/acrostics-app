@@ -23,9 +23,15 @@ export function AcrosticPuzzleScreen({
   storageDate,
 }: AcrosticPuzzleScreenProps) {
   const normalized = normalizePuzzle(puzzle);
-  const rawGridNumbersInOrder = normalized.lookup.gridNumbersInOrder;
-  const gridNumbersKey = rawGridNumbersInOrder.join(",");
-  const gridNumbersInOrder = useMemo(() => rawGridNumbersInOrder, [gridNumbersKey]);
+  const gridNumbersKey = normalized.lookup.gridNumbersInOrder.join(",");
+  const gridNumbersInOrder = useMemo(
+    () =>
+      gridNumbersKey
+        .split(",")
+        .filter(Boolean)
+        .map((value) => Number.parseInt(value, 10)),
+    [gridNumbersKey],
+  );
 
   const [entriesByNumber, setEntriesByNumber] = useState<Record<number, string>>({});
 

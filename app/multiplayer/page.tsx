@@ -1,42 +1,20 @@
-import { redirect } from "next/navigation";
+import { Suspense } from "react";
 
-import { getBundledAcrosticSelection, readDateSearchParam } from "@/lib/acrostics-archive";
-import { MultiplayerScreen } from "../multiplayer-screen";
+import { MultiplayerRoute } from "../multiplayer-route";
+import { RouteStatusScreen } from "../route-status-screen";
 
-type SearchParams = Record<string, string | string[] | undefined>;
-
-type MultiplayerPageProps = {
-  searchParams?: Promise<SearchParams>;
-};
-
-function readSessionSearchParam(value: string | string[] | undefined): string | null {
-  const candidate = Array.isArray(value) ? value[0] : value;
-
-  if (typeof candidate !== "string") {
-    return null;
-  }
-
-  const trimmed = candidate.trim();
-  return trimmed.length > 0 ? trimmed : null;
-}
-
-export default async function MultiplayerPage({
-  searchParams,
-}: MultiplayerPageProps) {
-  const resolvedSearchParams = ((await searchParams) ?? {}) as SearchParams;
-  const requestedDate = readDateSearchParam(resolvedSearchParams.date);
-  const sessionId = readSessionSearchParam(resolvedSearchParams.session);
-  const { puzzle, selectedDate } = getBundledAcrosticSelection(requestedDate);
-
-  if (!sessionId) {
-    redirect(`/?date=${selectedDate}`);
-  }
-
+export default function MultiplayerPage() {
   return (
-    <MultiplayerScreen
-      puzzle={puzzle}
-      selectedDate={selectedDate}
-      sessionId={sessionId}
-    />
+    <Suspense
+      fallback={
+        <RouteStatusScreen
+          body="Loading the selected puzzle and preparing the multiplayer session."
+          eyebrow="Multiplayer"
+          title="Loading session"
+        />
+      }
+    >
+      <MultiplayerRoute />
+    </Suspense>
   );
 }

@@ -19,6 +19,7 @@ import {
   type MultiplayerRole,
   type MultiplayerSessionRecord,
 } from "@/lib/acrostics-multiplayer";
+import { buildUrlWithBasePath } from "@/lib/site-paths";
 import { normalizePuzzle, type XWordInfoPuzzle } from "./acrostic";
 import { AcrosticBoard, type AcrosticBoardPresence } from "./acrostic-board";
 
@@ -62,14 +63,10 @@ function toBoardEntries(
 }
 
 function buildInviteUrl(sessionId: string, date: string) {
-  if (typeof window === "undefined") {
-    return `/multiplayer?date=${encodeURIComponent(date)}&session=${encodeURIComponent(sessionId)}`;
-  }
-
-  const url = new URL("/multiplayer", window.location.origin);
-  url.searchParams.set("date", date);
-  url.searchParams.set("session", sessionId);
-  return url.toString();
+  return buildUrlWithBasePath("/multiplayer/", {
+    date,
+    session: sessionId,
+  });
 }
 
 function getPeerErrorMessage(error: unknown) {
