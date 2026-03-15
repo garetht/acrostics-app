@@ -50,6 +50,11 @@ function cx(...values: Array<string | false | null | undefined>) {
   return values.filter(Boolean).join(" ");
 }
 
+function buildResponsiveGridTemplateColumns(columnCount: number) {
+  const gapWidth = Math.max(0, columnCount - 1);
+  return `repeat(${columnCount}, minmax(var(--board-grid-cell-size), calc((100% - ${gapWidth}px) / ${columnCount})))`;
+}
+
 export function AcrosticBoard({
   entriesByNumber,
   isReadOnly = false,
@@ -431,82 +436,86 @@ export function AcrosticBoard({
 
         <div className="overflow-x-auto pb-2">
           <div
-            className="grid min-w-max w-full gap-px rounded-[1.5rem] border border-[color:var(--line)] bg-[color:var(--line)] p-px"
-            data-testid="quote-grid"
-            style={{
-              gridTemplateColumns: `repeat(${normalized.cols}, minmax(var(--board-grid-cell-size), 1fr))`,
-            }}
+            className="min-w-max w-full rounded-[1.5rem] border border-[color:var(--line)] bg-[color:var(--line)] p-px"
           >
-            {normalized.grid.map((cell) => {
-              if (cell.isBlock || typeof cell.number !== "number") {
+            <div
+              className="grid gap-px"
+              data-testid="quote-grid"
+              style={{
+                gridTemplateColumns: buildResponsiveGridTemplateColumns(normalized.cols),
+              }}
+            >
+              {normalized.grid.map((cell) => {
+                if (cell.isBlock || typeof cell.number !== "number") {
+                  return (
+                    <div
+                      key={`block-${cell.index}`}
+                      aria-hidden="true"
+                      className="h-[var(--board-grid-row-height)] bg-[#2f3136]"
+                    />
+                  );
+                }
+
+                const cellNumber = cell.number;
+                const isActive = cellNumber === activeNumber;
+                const isInActiveClue = activeNumbers.includes(cellNumber);
+                const isRemoteActive = remotePresence?.activeNumber === cellNumber;
+                const isRemoteClue = remotePresence?.activeClueId === cell.clueLabel;
+                const isRemoteFlash = remoteFlashNumberSet.has(cellNumber);
+
                 return (
-                  <div
-                    key={`block-${cell.index}`}
-                    aria-hidden="true"
-                    className="h-[var(--board-grid-row-height)] bg-[#2f3136]"
-                  />
+                  <label
+                    key={`grid-${cellNumber}`}
+                    className={cx(
+                      "relative flex h-[var(--board-grid-row-height)] items-stretch overflow-hidden transition-colors",
+                      isActive
+                        ? "bg-[color:var(--accent)]"
+                        : isRemoteActive
+                          ? "bg-[color:var(--remote-soft)]"
+                          : isInActiveClue
+                            ? "bg-[color:var(--accent-soft)]"
+                            : isRemoteClue
+                              ? "bg-[color:var(--remote-soft)]"
+                              : "bg-[color:var(--panel-strong)]",
+                      isRemoteFlash && "ring-2 ring-inset ring-[color:var(--remote-accent)]",
+                    )}
+                  >
+                    <span className="pointer-events-none absolute left-1.5 top-1 text-[0.66rem] font-medium text-[color:var(--muted)]">
+                      {cellNumber}
+                    </span>
+                    <span className="pointer-events-none absolute right-1.5 top-1 text-[0.68rem] font-semibold text-[color:var(--muted)]">
+                      {cell.clueLabel}
+                    </span>
+                    <input
+                      ref={(node) => {
+                        gridInputRefs.current[cellNumber] = node;
+                      }}
+                      aria-label={`Quote grid cell ${cellNumber}`}
+                      autoCapitalize="characters"
+                      autoComplete="off"
+                      className="h-full w-full bg-transparent px-1 pt-3.5 text-center text-[1.2rem] font-semibold uppercase text-[color:var(--foreground)] outline-none disabled:cursor-not-allowed disabled:text-[color:var(--muted)]"
+                      disabled={isReadOnly}
+                      inputMode="text"
+                      maxLength={1}
+                      onChange={(event) => {
+                        handleCharacterEntry(cellNumber, "grid", event.target.value);
+                      }}
+                      onFocus={() => {
+                        setActivePosition(cellNumber, "grid");
+                      }}
+                      onKeyDown={(event) => {
+                        handleKeyDown(event, cellNumber, "grid");
+                      }}
+                      onPaste={(event) => {
+                        handlePaste(event, cellNumber, "grid");
+                      }}
+                      spellCheck={false}
+                      value={entriesByNumber[cellNumber] ?? ""}
+                    />
+                  </label>
                 );
-              }
-
-              const cellNumber = cell.number;
-              const isActive = cellNumber === activeNumber;
-              const isInActiveClue = activeNumbers.includes(cellNumber);
-              const isRemoteActive = remotePresence?.activeNumber === cellNumber;
-              const isRemoteClue = remotePresence?.activeClueId === cell.clueLabel;
-              const isRemoteFlash = remoteFlashNumberSet.has(cellNumber);
-
-              return (
-                <label
-                  key={`grid-${cellNumber}`}
-                  className={cx(
-                    "relative flex h-[var(--board-grid-row-height)] items-stretch overflow-hidden transition-colors",
-                    isActive
-                      ? "bg-[color:var(--accent)]"
-                      : isRemoteActive
-                        ? "bg-[color:var(--remote-soft)]"
-                        : isInActiveClue
-                          ? "bg-[color:var(--accent-soft)]"
-                          : isRemoteClue
-                            ? "bg-[color:var(--remote-soft)]"
-                            : "bg-[color:var(--panel-strong)]",
-                    isRemoteFlash && "ring-2 ring-inset ring-[color:var(--remote-accent)]",
-                  )}
-                >
-                  <span className="pointer-events-none absolute left-1.5 top-1 text-[0.66rem] font-medium text-[color:var(--muted)]">
-                    {cellNumber}
-                  </span>
-                  <span className="pointer-events-none absolute right-1.5 top-1 text-[0.68rem] font-semibold text-[color:var(--muted)]">
-                    {cell.clueLabel}
-                  </span>
-                  <input
-                    ref={(node) => {
-                      gridInputRefs.current[cellNumber] = node;
-                    }}
-                    aria-label={`Quote grid cell ${cellNumber}`}
-                    autoCapitalize="characters"
-                    autoComplete="off"
-                    className="h-full w-full bg-transparent px-1 pt-3.5 text-center text-[1.2rem] font-semibold uppercase text-[color:var(--foreground)] outline-none disabled:cursor-not-allowed disabled:text-[color:var(--muted)]"
-                    disabled={isReadOnly}
-                    inputMode="text"
-                    maxLength={1}
-                    onChange={(event) => {
-                      handleCharacterEntry(cellNumber, "grid", event.target.value);
-                    }}
-                    onFocus={() => {
-                      setActivePosition(cellNumber, "grid");
-                    }}
-                    onKeyDown={(event) => {
-                      handleKeyDown(event, cellNumber, "grid");
-                    }}
-                    onPaste={(event) => {
-                      handlePaste(event, cellNumber, "grid");
-                    }}
-                    spellCheck={false}
-                    value={entriesByNumber[cellNumber] ?? ""}
-                  />
-                </label>
-              );
-            })}
+              })}
+            </div>
           </div>
         </div>
       </section>
@@ -517,42 +526,46 @@ export function AcrosticBoard({
         </p>
         <div className="mt-3 overflow-x-auto pb-2">
           <div
-            className="grid w-max gap-px rounded-[1.2rem] border border-[color:var(--line)] bg-[color:var(--line)] p-px"
-            data-testid="title-grid"
-            style={{
-              gridTemplateColumns: `repeat(${titleCellCount}, minmax(var(--board-grid-cell-size), var(--board-grid-cell-size)))`,
-            }}
+            className="min-w-max w-full rounded-[1.2rem] border border-[color:var(--line)] bg-[color:var(--line)] p-px"
           >
-            {normalized.titleCells.map((cell) => {
-              const isActive = cell.clueId === activeClue.id;
-              const isRemoteActive = remotePresence?.activeClueId === cell.clueId;
+            <div
+              className="grid gap-px"
+              data-testid="title-grid"
+              style={{
+                gridTemplateColumns: buildResponsiveGridTemplateColumns(titleCellCount),
+              }}
+            >
+              {normalized.titleCells.map((cell) => {
+                const isActive = cell.clueId === activeClue.id;
+                const isRemoteActive = remotePresence?.activeClueId === cell.clueId;
 
-              return (
-                <button
-                  key={`title-${cell.sourceNumber}`}
-                  className={cx(
-                    "relative flex h-[var(--board-title-row-height)] items-center justify-center text-center transition-colors disabled:cursor-not-allowed",
-                    isActive
-                      ? "bg-[color:var(--accent)]"
-                      : isRemoteActive
-                        ? "bg-[color:var(--remote-soft)]"
-                        : "bg-[color:var(--panel-strong)]",
-                  )}
-                  disabled={isReadOnly}
-                  onClick={() => {
-                    setActiveClue(cell.clueId, "clue", cell.sourceNumber);
-                  }}
-                  type="button"
-                >
-                  <span className="absolute left-1.5 top-1 text-[0.68rem] font-semibold text-[color:var(--muted)]">
-                    {cell.label}
-                  </span>
-                  <span className="text-lg font-semibold uppercase text-[color:var(--foreground)]">
-                    {entriesByNumber[cell.sourceNumber] ?? ""}
-                  </span>
-                </button>
-              );
-            })}
+                return (
+                  <button
+                    key={`title-${cell.sourceNumber}`}
+                    className={cx(
+                      "relative flex h-[var(--board-title-row-height)] items-center justify-center text-center transition-colors disabled:cursor-not-allowed",
+                      isActive
+                        ? "bg-[color:var(--accent)]"
+                        : isRemoteActive
+                          ? "bg-[color:var(--remote-soft)]"
+                          : "bg-[color:var(--panel-strong)]",
+                    )}
+                    disabled={isReadOnly}
+                    onClick={() => {
+                      setActiveClue(cell.clueId, "clue", cell.sourceNumber);
+                    }}
+                    type="button"
+                  >
+                    <span className="absolute left-1.5 top-1 text-[0.68rem] font-semibold text-[color:var(--muted)]">
+                      {cell.label}
+                    </span>
+                    <span className="text-lg font-semibold uppercase text-[color:var(--foreground)]">
+                      {entriesByNumber[cell.sourceNumber] ?? ""}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
           </div>
         </div>
         <p className="mt-3 text-sm italic text-[color:var(--muted)]">
