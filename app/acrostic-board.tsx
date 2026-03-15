@@ -337,7 +337,7 @@ export function AcrosticBoard({
 
   return (
     <>
-      <section className="rounded-[2rem] border border-[color:var(--line)] bg-[color:var(--panel)] p-5 shadow-[0_18px_40px_-30px_rgba(60,36,18,0.4)] md:p-6">
+      <section className="rounded-[2rem] border border-[color:var(--line)] bg-[color:var(--panel)] p-[var(--surface-padding)] shadow-[0_18px_40px_-30px_rgba(60,36,18,0.4)] md:p-[var(--surface-padding-lg)]">
         <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
           <div>
             <p className="text-sm font-semibold uppercase tracking-[0.28em] text-[color:var(--muted)]">
@@ -357,13 +357,13 @@ export function AcrosticBoard({
           ) : null}
         </div>
 
-        <div className="mt-3 flex flex-col gap-4">
+        <div className="mt-2.5 flex flex-col gap-3">
           <p className="text-xl font-semibold leading-8 tracking-[-0.02em] text-[color:var(--foreground)] md:text-[1.65rem]">
             <span className="mr-3 text-[color:var(--accent-ink)]">{activeClue.label}.</span>
             {activeClue.text}
           </p>
 
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-1.5">
             {activeNumbers.map((number) => {
               const isActive = number === activeNumber;
               const isRemoteActive = remotePresence?.activeNumber === number;
@@ -373,7 +373,7 @@ export function AcrosticBoard({
                 <label
                   key={`clue-${number}`}
                   className={cx(
-                    "relative flex h-[4.5rem] w-14 items-stretch overflow-hidden rounded-[1.1rem] border transition-all",
+                    "relative flex h-[var(--board-clue-chip-height)] w-[var(--board-clue-chip-width)] items-stretch overflow-hidden rounded-[1rem] border transition-all",
                     isActive
                       ? "border-[color:var(--accent-ink)] bg-[color:var(--accent)] shadow-[0_12px_30px_-18px_rgba(124,71,17,0.7)]"
                       : isRemoteActive
@@ -382,7 +382,7 @@ export function AcrosticBoard({
                     isRemoteFlash && "ring-2 ring-inset ring-[color:var(--remote-accent)]",
                   )}
                 >
-                  <span className="pointer-events-none absolute left-2 top-1.5 text-[0.68rem] font-semibold uppercase tracking-[0.15em] text-[color:var(--muted)]">
+                  <span className="pointer-events-none absolute left-1.5 top-1 text-[0.68rem] font-semibold uppercase tracking-[0.15em] text-[color:var(--muted)]">
                     {number}
                   </span>
                   <input
@@ -392,7 +392,7 @@ export function AcrosticBoard({
                     aria-label={`Clue ${activeClue.label} cell ${number}`}
                     autoCapitalize="characters"
                     autoComplete="off"
-                    className="h-full w-full bg-transparent px-2 pb-2 pt-6 text-center text-[1.9rem] font-semibold uppercase text-[color:var(--foreground)] outline-none disabled:cursor-not-allowed disabled:text-[color:var(--muted)]"
+                    className="h-full w-full bg-transparent px-1.5 pb-1.5 pt-5 text-center text-[1.7rem] font-semibold uppercase text-[color:var(--foreground)] outline-none disabled:cursor-not-allowed disabled:text-[color:var(--muted)]"
                     disabled={isReadOnly}
                     inputMode="text"
                     maxLength={1}
@@ -418,8 +418,8 @@ export function AcrosticBoard({
         </div>
       </section>
 
-      <section className="rounded-[2rem] border border-[color:var(--line)] bg-[color:var(--panel)] p-3 shadow-[0_18px_40px_-30px_rgba(60,36,18,0.4)] md:p-4">
-        <div className="mb-4 flex items-center justify-between px-2">
+      <section className="rounded-[2rem] border border-[color:var(--line)] bg-[color:var(--panel)] p-2.5 shadow-[0_18px_40px_-30px_rgba(60,36,18,0.4)] md:p-3">
+        <div className="mb-3 flex items-center justify-between px-1.5">
           <p className="text-sm font-semibold uppercase tracking-[0.28em] text-[color:var(--muted)]">
             Quote grid
           </p>
@@ -430,9 +430,10 @@ export function AcrosticBoard({
 
         <div className="overflow-x-auto pb-2">
           <div
-            className="grid w-max gap-px rounded-[1.75rem] border border-[color:var(--line)] bg-[color:var(--line)] p-px"
+            className="grid w-max gap-px rounded-[1.5rem] border border-[color:var(--line)] bg-[color:var(--line)] p-px"
+            data-testid="quote-grid"
             style={{
-              gridTemplateColumns: `repeat(${normalized.cols}, minmax(2.9rem, 2.9rem))`,
+              gridTemplateColumns: `repeat(${normalized.cols}, minmax(var(--board-grid-cell-size), var(--board-grid-cell-size)))`,
             }}
           >
             {normalized.grid.map((cell) => {
@@ -441,7 +442,7 @@ export function AcrosticBoard({
                   <div
                     key={`block-${cell.index}`}
                     aria-hidden="true"
-                    className="h-[3.75rem] bg-[#2f3136]"
+                    className="h-[var(--board-grid-row-height)] bg-[#2f3136]"
                   />
                 );
               }
@@ -457,7 +458,7 @@ export function AcrosticBoard({
                 <label
                   key={`grid-${cellNumber}`}
                   className={cx(
-                    "relative flex h-[3.75rem] items-stretch overflow-hidden transition-colors",
+                    "relative flex h-[var(--board-grid-row-height)] items-stretch overflow-hidden transition-colors",
                     isActive
                       ? "bg-[color:var(--accent)]"
                       : isRemoteActive
@@ -483,7 +484,7 @@ export function AcrosticBoard({
                     aria-label={`Quote grid cell ${cellNumber}`}
                     autoCapitalize="characters"
                     autoComplete="off"
-                    className="h-full w-full bg-transparent px-1 pt-4 text-center text-[1.35rem] font-semibold uppercase text-[color:var(--foreground)] outline-none disabled:cursor-not-allowed disabled:text-[color:var(--muted)]"
+                    className="h-full w-full bg-transparent px-1 pt-3.5 text-center text-[1.2rem] font-semibold uppercase text-[color:var(--foreground)] outline-none disabled:cursor-not-allowed disabled:text-[color:var(--muted)]"
                     disabled={isReadOnly}
                     inputMode="text"
                     maxLength={1}
@@ -509,15 +510,16 @@ export function AcrosticBoard({
         </div>
       </section>
 
-      <section className="rounded-[2rem] border border-[color:var(--line)] bg-[color:var(--panel)] p-4 shadow-[0_18px_40px_-30px_rgba(60,36,18,0.4)] md:p-5">
+      <section className="rounded-[2rem] border border-[color:var(--line)] bg-[color:var(--panel)] p-3 shadow-[0_18px_40px_-30px_rgba(60,36,18,0.4)] md:p-4">
         <p className="text-sm font-semibold uppercase tracking-[0.28em] text-[color:var(--muted)]">
           Author and title
         </p>
         <div className="mt-3 overflow-x-auto pb-2">
           <div
-            className="grid w-max gap-px rounded-[1.3rem] border border-[color:var(--line)] bg-[color:var(--line)] p-px"
+            className="grid w-max gap-px rounded-[1.2rem] border border-[color:var(--line)] bg-[color:var(--line)] p-px"
+            data-testid="title-grid"
             style={{
-              gridTemplateColumns: `repeat(${titleCellCount}, minmax(2.9rem, 2.9rem))`,
+              gridTemplateColumns: `repeat(${titleCellCount}, minmax(var(--board-grid-cell-size), var(--board-grid-cell-size)))`,
             }}
           >
             {normalized.titleCells.map((cell) => {
@@ -528,7 +530,7 @@ export function AcrosticBoard({
                 <button
                   key={`title-${cell.sourceNumber}`}
                   className={cx(
-                    "relative flex h-12 items-center justify-center text-center transition-colors disabled:cursor-not-allowed",
+                    "relative flex h-[var(--board-title-row-height)] items-center justify-center text-center transition-colors disabled:cursor-not-allowed",
                     isActive
                       ? "bg-[color:var(--accent)]"
                       : isRemoteActive
@@ -544,7 +546,7 @@ export function AcrosticBoard({
                   <span className="absolute left-1.5 top-1 text-[0.68rem] font-semibold text-[color:var(--muted)]">
                     {cell.label}
                   </span>
-                  <span className="text-xl font-semibold uppercase text-[color:var(--foreground)]">
+                  <span className="text-lg font-semibold uppercase text-[color:var(--foreground)]">
                     {entriesByNumber[cell.sourceNumber] ?? ""}
                   </span>
                 </button>
@@ -557,12 +559,12 @@ export function AcrosticBoard({
         </p>
       </section>
 
-      <section className="rounded-[2rem] border border-[color:var(--line)] bg-[color:var(--panel)] p-5 shadow-[0_18px_40px_-30px_rgba(60,36,18,0.4)] md:p-6">
-        <p className="text-xl font-semibold tracking-[-0.03em] text-[color:var(--accent-ink)]">
+      <section className="rounded-[2rem] border border-[color:var(--line)] bg-[color:var(--panel)] p-[var(--surface-padding)] shadow-[0_18px_40px_-30px_rgba(60,36,18,0.4)] md:p-[var(--surface-padding-lg)]">
+        <p className="text-lg font-semibold tracking-[-0.03em] text-[color:var(--accent-ink)] md:text-xl">
           Click any clue or number below to go directly to that location
         </p>
 
-        <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+        <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
           {normalized.clues.map((clue) => {
             const isActive = clue.id === activeClue.id;
             const isRemoteActive = remotePresence?.activeClueId === clue.id;
@@ -571,7 +573,7 @@ export function AcrosticBoard({
               <button
                 key={clue.id}
                 className={cx(
-                  "flex items-start gap-3 rounded-[1.35rem] border px-4 py-3 text-left transition-all disabled:cursor-not-allowed",
+                  "flex items-start gap-2.5 rounded-[1.25rem] border px-3.5 py-2.5 text-left transition-all disabled:cursor-not-allowed",
                   isActive
                     ? "border-[color:var(--accent-ink)] bg-[color:var(--accent-soft)]"
                     : isRemoteActive
@@ -594,7 +596,7 @@ export function AcrosticBoard({
                 >
                   {clue.label}.
                 </span>
-                <span className="text-base leading-7 text-[color:var(--foreground)]">
+                <span className="text-[0.98rem] leading-6 text-[color:var(--foreground)]">
                   {clue.text}
                 </span>
               </button>

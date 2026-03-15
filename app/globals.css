@@ -5,6 +5,18 @@
     "SFMono-Regular", "SF Mono", "IBM Plex Mono", "Roboto Mono", "Menlo", monospace;
   --app-font-sans:
     "Avenir Next", "Segoe UI", "Helvetica Neue", "Franklin Gothic Medium", sans-serif;
+  --page-shell-max-width: 1720px;
+  --page-shell-inline-padding: 1rem;
+  --page-shell-block-padding: 1.25rem;
+  --page-shell-gap: 1.25rem;
+  --surface-padding: 1.25rem;
+  --surface-padding-lg: 1.5rem;
+  --archive-rail-width: 19rem;
+  --board-grid-cell-size: 2.65rem;
+  --board-grid-row-height: 3.4rem;
+  --board-title-row-height: 2.75rem;
+  --board-clue-chip-width: 3.25rem;
+  --board-clue-chip-height: 4.2rem;
   --background: #eadfcd;
   --foreground: #2f241c;
   --panel: #f8f3ea;
@@ -45,6 +57,19 @@ body {
     linear-gradient(180deg, #f3eadc 0%, #e4d6c2 100%);
   color: var(--foreground);
   font-family: var(--app-font-sans);
+}
+
+@media (min-width: 768px) {
+  :root {
+    --page-shell-inline-padding: 1.5rem;
+    --page-shell-block-padding: 1.5rem;
+  }
+}
+
+@media (min-width: 1280px) {
+  :root {
+    --page-shell-block-padding: 1.75rem;
+  }
 }
 
 ::selection {

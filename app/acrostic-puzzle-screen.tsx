@@ -82,9 +82,9 @@ export function AcrosticPuzzleScreen({
 
   return (
     <div className="min-w-0">
-      <main className="flex w-full flex-col gap-6">
-        <header className="rounded-[2rem] border border-[color:var(--line)] bg-[color:var(--panel)] p-6 shadow-[0_24px_70px_-40px_rgba(60,36,18,0.45)]">
-          <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+      <main className="flex w-full flex-col gap-[var(--page-shell-gap)]">
+        <header className="rounded-[2rem] border border-[color:var(--line)] bg-[color:var(--panel)] p-[var(--surface-padding)] shadow-[0_24px_70px_-40px_rgba(60,36,18,0.45)] md:p-[var(--surface-padding-lg)]">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
             <div className="max-w-4xl">
               <p className="text-xs font-semibold uppercase tracking-[0.38em] text-[color:var(--muted)]">
                 Sunday Acrostic
@@ -94,7 +94,7 @@ export function AcrosticPuzzleScreen({
               </h1>
             </div>
 
-            <div className="flex flex-col gap-4 lg:items-end">
+            <div className="flex flex-col gap-3 lg:items-end">
               <div className="text-sm text-[color:var(--muted)] lg:text-right">
                 <p>{normalized.meta.date}</p>
                 {normalized.meta.copyright ? (

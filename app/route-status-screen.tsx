@@ -20,9 +20,12 @@ export function RouteStatusScreen({
   title,
 }: RouteStatusScreenProps) {
   return (
-    <div className="min-h-screen px-4 py-6 md:px-8 md:py-8">
-      <main className="mx-auto flex w-full max-w-[960px] flex-col gap-6">
-        <section className="rounded-[2rem] border border-[color:var(--line)] bg-[color:var(--panel)] p-6 shadow-[0_24px_70px_-40px_rgba(60,36,18,0.45)] md:p-8">
+    <div className="min-h-screen px-[var(--page-shell-inline-padding)] py-[var(--page-shell-block-padding)]">
+      <main
+        className="mx-auto flex w-full max-w-[920px] flex-col gap-[var(--page-shell-gap)]"
+        data-testid="route-status-layout"
+      >
+        <section className="rounded-[2rem] border border-[color:var(--line)] bg-[color:var(--panel)] p-[var(--surface-padding)] shadow-[0_24px_70px_-40px_rgba(60,36,18,0.45)] md:p-[var(--surface-padding-lg)]">
           <p className="text-xs font-semibold uppercase tracking-[0.34em] text-[color:var(--muted)]">
             {eyebrow}
           </p>

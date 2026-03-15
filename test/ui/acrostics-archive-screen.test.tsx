@@ -129,4 +129,24 @@ describe("AcrosticsArchiveScreen", () => {
 
     expect(screen.getByText("2/3")).toBeInTheDocument();
   });
+
+  it("uses the wider compact desktop shell for the archive layout", () => {
+    render(
+      <AcrosticsArchiveScreen
+        availableDates={["2025-12-28"]}
+        cellCountByDate={{
+          "2025-12-28": 2,
+        }}
+        latestDate="2025-12-28"
+        puzzle={makePuzzle()}
+        selectedDate="2025-12-28"
+      />,
+    );
+
+    expect(screen.getByTestId("archive-layout")).toHaveClass(
+      "max-w-[var(--page-shell-max-width)]",
+      "gap-[var(--page-shell-gap)]",
+      "xl:grid-cols-[var(--archive-rail-width)_minmax(0,1fr)]",
+    );
+  });
 });
