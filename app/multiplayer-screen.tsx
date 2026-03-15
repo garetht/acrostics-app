@@ -600,10 +600,13 @@ export function MultiplayerScreen({
   }, []);
 
   return (
-    <div className="min-h-screen px-4 py-6 md:px-8 md:py-8">
-      <main className="mx-auto flex w-full max-w-[1540px] flex-col gap-6">
-        <header className="rounded-[2rem] border border-[color:var(--line)] bg-[color:var(--panel)] p-6 shadow-[0_24px_70px_-40px_rgba(60,36,18,0.45)]">
-          <div className="flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
+    <div className="min-h-screen px-[var(--page-shell-inline-padding)] py-[var(--page-shell-block-padding)]">
+      <main
+        className="mx-auto flex w-full max-w-[var(--page-shell-max-width)] flex-col gap-[var(--page-shell-gap)]"
+        data-testid="multiplayer-layout"
+      >
+        <header className="rounded-[2rem] border border-[color:var(--line)] bg-[color:var(--panel)] p-[var(--surface-padding)] shadow-[0_24px_70px_-40px_rgba(60,36,18,0.45)] md:p-[var(--surface-padding-lg)]">
+          <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
             <div className="max-w-4xl">
               <p className="text-xs font-semibold uppercase tracking-[0.38em] text-[color:var(--remote-ink)]">
                 Peer-to-peer multiplayer
@@ -621,7 +624,7 @@ export function MultiplayerScreen({
               ) : null}
             </div>
 
-            <div className="flex flex-col gap-4 xl:items-end">
+            <div className="flex flex-col gap-3 xl:items-end">
               <div className="text-sm text-[color:var(--muted)] xl:text-right">
                 <p>{normalized.meta.date}</p>
                 {normalized.meta.copyright ? <p>{normalized.meta.copyright}</p> : null}
@@ -630,7 +633,7 @@ export function MultiplayerScreen({
                 </p>
               </div>
 
-              <div className="flex flex-wrap gap-3 xl:justify-end">
+              <div className="flex flex-wrap gap-2.5 xl:justify-end">
                 {role === "host" ? (
                   <button
                     className="rounded-full border border-[color:var(--remote-accent)] bg-[color:var(--remote-soft)] px-4 py-2 text-sm font-semibold uppercase tracking-[0.14em] text-[color:var(--remote-ink)] transition hover:bg-[#c8daef]"
@@ -672,7 +675,7 @@ export function MultiplayerScreen({
         </header>
 
         {hasTerminalError ? (
-          <section className="rounded-[2rem] border border-[color:var(--danger)] bg-[color:var(--danger-soft)] p-5 shadow-[0_18px_40px_-30px_rgba(92,31,23,0.42)]">
+          <section className="rounded-[2rem] border border-[color:var(--danger)] bg-[color:var(--danger-soft)] p-[var(--surface-padding)] shadow-[0_18px_40px_-30px_rgba(92,31,23,0.42)]">
             <p className="text-sm font-semibold uppercase tracking-[0.28em] text-[color:var(--danger-ink)]">
               Multiplayer unavailable
             </p>

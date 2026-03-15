@@ -23,6 +23,7 @@ import { routerMock } from "./mocks/next-navigation";
 const boardState = vi.hoisted(() => ({
   props: null as AcrosticBoardProps | null,
 }));
+const ACTIVE_SESSION_UPDATED_AT = new Date().toISOString();
 
 vi.mock("@/app/acrostic-board", () => ({
   AcrosticBoard: (props: AcrosticBoardProps) => {
@@ -51,7 +52,7 @@ describe("MultiplayerScreen", () => {
       displayName: "Host",
       role: "host",
       sessionId: "host-session",
-      updatedAt: "2026-03-08T12:00:00.000Z",
+      updatedAt: ACTIVE_SESSION_UPDATED_AT,
     });
 
     seedMultiplayerStorage({
@@ -208,7 +209,7 @@ describe("MultiplayerScreen", () => {
       displayName: "Host",
       role: "host",
       sessionId: "host-session",
-      updatedAt: "2026-03-08T12:00:00.000Z",
+      updatedAt: ACTIVE_SESSION_UPDATED_AT,
     });
 
     seedMultiplayerStorage({
@@ -234,6 +235,35 @@ describe("MultiplayerScreen", () => {
     expect(await screen.findByRole("button", { name: "Copy failed" })).toBeInTheDocument();
   });
 
+  it("uses the compact shared shell spacing", async () => {
+    const sessionRecord = createMultiplayerSessionRecord({
+      clientId: "host-client",
+      date: "2026-03-08",
+      displayName: "Host",
+      role: "host",
+      sessionId: "host-session",
+      updatedAt: ACTIVE_SESSION_UPDATED_AT,
+    });
+
+    seedMultiplayerStorage({
+      [sessionRecord.sessionId]: sessionRecord,
+    });
+
+    render(
+      <MultiplayerScreen
+        puzzle={makePuzzle()}
+        selectedDate="2026-03-08"
+        sessionId="host-session"
+      />,
+    );
+
+    expect(await screen.findByRole("button", { name: "Copy invite link" })).toBeInTheDocument();
+    expect(screen.getByTestId("multiplayer-layout")).toHaveClass(
+      "max-w-[var(--page-shell-max-width)]",
+      "gap-[var(--page-shell-gap)]",
+    );
+  });
+
   it("ends host sessions, notifies the guest, clears storage, and routes home", async () => {
     const sessionRecord = createMultiplayerSessionRecord({
       clientId: "host-client",
@@ -241,7 +271,7 @@ describe("MultiplayerScreen", () => {
       displayName: "Host",
       role: "host",
       sessionId: "host-session",
-      updatedAt: "2026-03-08T12:00:00.000Z",
+      updatedAt: ACTIVE_SESSION_UPDATED_AT,
     });
 
     seedMultiplayerStorage({

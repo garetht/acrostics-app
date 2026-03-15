@@ -76,11 +76,14 @@ export function AcrosticsArchiveScreen({
   }, [availableDates]);
 
   return (
-    <div className="min-h-screen px-4 py-6 md:px-8 md:py-8">
-      <main className="mx-auto grid w-full max-w-[1540px] gap-6 xl:grid-cols-[22rem_minmax(0,1fr)]">
-        <aside className="xl:sticky xl:top-6 xl:self-start">
+    <div className="min-h-screen px-[var(--page-shell-inline-padding)] py-[var(--page-shell-block-padding)]">
+      <main
+        className="mx-auto grid w-full max-w-[var(--page-shell-max-width)] gap-[var(--page-shell-gap)] xl:grid-cols-[var(--archive-rail-width)_minmax(0,1fr)]"
+        data-testid="archive-layout"
+      >
+        <aside className="xl:sticky xl:top-[var(--page-shell-block-padding)] xl:self-start">
           <section className="overflow-hidden rounded-[2rem] border border-[color:var(--line)] bg-[color:var(--panel)] shadow-[0_24px_70px_-40px_rgba(60,36,18,0.45)]">
-            <header className="border-b border-[color:rgba(112,90,71,0.14)] px-5 py-5">
+            <header className="border-b border-[color:rgba(112,90,71,0.14)] px-4 py-4 md:px-5 md:py-5">
               <p className="text-xs font-semibold uppercase tracking-[0.34em] text-[color:var(--muted)]">
                 Archive
               </p>
@@ -96,10 +99,10 @@ export function AcrosticsArchiveScreen({
               </p>
             </header>
 
-            <div className="max-h-[68vh] overflow-y-auto px-3 py-3">
+            <div className="max-h-[68vh] overflow-y-auto px-2.5 py-2.5">
               {archiveSections.map((section) => (
-                <section key={section.year} className="pb-4 last:pb-0">
-                  <div className="sticky top-0 z-10 mx-2 rounded-full bg-[color:rgba(248,243,234,0.94)] px-3 py-2 backdrop-blur">
+                <section key={section.year} className="pb-3 last:pb-0">
+                  <div className="sticky top-0 z-10 mx-1.5 rounded-full bg-[color:rgba(248,243,234,0.94)] px-3 py-1.5 backdrop-blur">
                     <p className="text-xs font-semibold uppercase tracking-[0.3em] text-[color:var(--muted)]">
                       {section.year}
                     </p>
@@ -121,7 +124,7 @@ export function AcrosticsArchiveScreen({
                           aria-current={isSelected ? "page" : undefined}
                           ref={isSelected ? selectedDateRef : undefined}
                           className={[
-                            "group mx-1 rounded-[1.35rem] border px-4 py-3 transition-all",
+                            "group mx-1 rounded-[1.25rem] border px-3.5 py-2.5 transition-all",
                             isSelected
                               ? "border-[color:var(--accent-ink)] bg-[color:var(--accent-soft)] shadow-[0_18px_36px_-28px_rgba(124,71,17,0.55)]"
                               : "border-transparent bg-transparent hover:border-[color:rgba(112,90,71,0.18)] hover:bg-[color:var(--panel-strong)]",
