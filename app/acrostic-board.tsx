@@ -434,12 +434,10 @@ export function AcrosticBoard({
           </p>
         </div>
 
-        <div className="overflow-x-auto pb-2">
-          <div
-            className="min-w-max w-full rounded-[1.5rem] border border-[color:var(--line)] bg-[color:var(--line)] p-px"
-          >
+        <div className="overflow-hidden rounded-[1.5rem] border border-[color:var(--line)] bg-[color:var(--line)] p-px">
+          <div className="overflow-x-auto pb-2">
             <div
-              className="grid gap-px"
+              className="grid min-w-max w-full gap-px bg-[color:var(--line)]"
               data-testid="quote-grid"
               style={{
                 gridTemplateColumns: buildResponsiveGridTemplateColumns(normalized.cols),
@@ -524,12 +522,10 @@ export function AcrosticBoard({
         <p className="text-sm font-semibold uppercase tracking-[0.28em] text-[color:var(--muted)]">
           Author and title
         </p>
-        <div className="mt-3 overflow-x-auto pb-2">
-          <div
-            className="min-w-max w-full rounded-[1.2rem] border border-[color:var(--line)] bg-[color:var(--line)] p-px"
-          >
+        <div className="mt-3 overflow-hidden rounded-[1.2rem] border border-[color:var(--line)] bg-[color:var(--line)] p-px">
+          <div className="overflow-x-auto pb-2">
             <div
-              className="grid gap-px"
+              className="grid min-w-max w-full gap-px bg-[color:var(--line)]"
               data-testid="title-grid"
               style={{
                 gridTemplateColumns: buildResponsiveGridTemplateColumns(titleCellCount),

@@ -183,11 +183,11 @@ describe("AcrosticBoard", () => {
       "h-[var(--board-clue-chip-height)]",
       "w-[var(--board-clue-chip-width)]",
     );
-    expect(screen.getByTestId("quote-grid").parentElement).toHaveClass("min-w-max", "w-full");
+    expect(screen.getByTestId("quote-grid")).toHaveClass("min-w-max", "w-full");
     expect(screen.getByTestId("quote-grid").style.gridTemplateColumns).toBe(
       "repeat(5, minmax(var(--board-grid-cell-size), calc((100% - 4px) / 5)))",
     );
-    expect(screen.getByTestId("title-grid").parentElement).toHaveClass("min-w-max", "w-full");
+    expect(screen.getByTestId("title-grid")).toHaveClass("min-w-max", "w-full");
     expect(screen.getByTestId("title-grid").style.gridTemplateColumns).toBe(
       "repeat(2, minmax(var(--board-grid-cell-size), calc((100% - 1px) / 2)))",
     );
