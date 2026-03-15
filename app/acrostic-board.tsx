@@ -280,6 +280,7 @@ export function AcrosticBoard({
       if (entriesByNumber[number]) {
         onEntriesPatch([{ number, value: "" }]);
         pulseTyping();
+        moveAlongSequence(number, surface, -1);
         return;
       }
 

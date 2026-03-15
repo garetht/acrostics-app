@@ -109,20 +109,32 @@ describe("AcrosticBoard", () => {
     expect(screen.getByLabelText("Clue A cell 3")).toHaveFocus();
   });
 
-  it("clears filled cells before moving backward on backspace", async () => {
+  it("clears filled cells and moves backward on backspace", async () => {
     render(<ControlledBoard initialEntries={{ 1: "A", 2: "B" }} />);
 
     const secondCell = screen.getByLabelText("Clue A cell 2");
     secondCell.focus();
+    await flushTimers();
 
     fireEvent.keyDown(secondCell, { key: "Backspace" });
+    await flushTimers();
+
     expect(secondCell).toHaveValue("");
-    expect(secondCell).toHaveFocus();
+    expect(screen.getByLabelText("Clue A cell 1")).toHaveFocus();
+  });
+
+  it("moves backward on backspace when the current cell is already empty", async () => {
+    render(<ControlledBoard initialEntries={{ 1: "A" }} />);
+
+    const secondCell = screen.getByLabelText("Clue A cell 2");
+    secondCell.focus();
+    await flushTimers();
 
     fireEvent.keyDown(secondCell, { key: "Backspace" });
     await flushTimers();
 
     expect(screen.getByLabelText("Clue A cell 1")).toHaveFocus();
+    expect(screen.getByLabelText("Clue A cell 1")).toHaveValue("A");
   });
 
   it("supports arrow-key navigation, including vertical movement in the quote grid", async () => {
