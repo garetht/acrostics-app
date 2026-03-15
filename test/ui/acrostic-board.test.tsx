@@ -176,15 +176,16 @@ describe("AcrosticBoard", () => {
     expect(onProgressChange).toHaveBeenLastCalledWith(2);
   });
 
-  it("uses the compact shared sizing for the clue chips and board grids", () => {
+  it("uses the compact shared sizing while letting the quote grid expand to fill wide layouts", () => {
     render(<ControlledBoard />);
 
     expect(screen.getByLabelText("Clue A cell 1").closest("label")).toHaveClass(
       "h-[var(--board-clue-chip-height)]",
       "w-[var(--board-clue-chip-width)]",
     );
+    expect(screen.getByTestId("quote-grid")).toHaveClass("min-w-max", "w-full");
     expect(screen.getByTestId("quote-grid").style.gridTemplateColumns).toBe(
-      "repeat(5, minmax(var(--board-grid-cell-size), var(--board-grid-cell-size)))",
+      "repeat(5, minmax(var(--board-grid-cell-size), 1fr))",
     );
     expect(screen.getByTestId("title-grid").style.gridTemplateColumns).toBe(
       "repeat(2, minmax(var(--board-grid-cell-size), var(--board-grid-cell-size)))",

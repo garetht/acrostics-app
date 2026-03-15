@@ -431,10 +431,10 @@ export function AcrosticBoard({
 
         <div className="overflow-x-auto pb-2">
           <div
-            className="grid w-max gap-px rounded-[1.5rem] border border-[color:var(--line)] bg-[color:var(--line)] p-px"
+            className="grid min-w-max w-full gap-px rounded-[1.5rem] border border-[color:var(--line)] bg-[color:var(--line)] p-px"
             data-testid="quote-grid"
             style={{
-              gridTemplateColumns: `repeat(${normalized.cols}, minmax(var(--board-grid-cell-size), var(--board-grid-cell-size)))`,
+              gridTemplateColumns: `repeat(${normalized.cols}, minmax(var(--board-grid-cell-size), 1fr))`,
             }}
           >
             {normalized.grid.map((cell) => {
