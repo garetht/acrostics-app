@@ -50,6 +50,11 @@ function cx(...values: Array<string | false | null | undefined>) {
   return values.filter(Boolean).join(" ");
 }
 
+function buildResponsiveGridTemplateColumns(columnCount: number) {
+  const gapWidth = Math.max(0, columnCount - 1);
+  return `repeat(${columnCount}, minmax(var(--board-grid-cell-size), calc((100% - ${gapWidth}px) / ${columnCount})))`;
+}
+
 export function AcrosticBoard({
   entriesByNumber,
   isReadOnly = false,
@@ -432,10 +437,10 @@ export function AcrosticBoard({
         <div className="overflow-hidden rounded-[1.5rem] border border-[color:var(--line)] bg-[color:var(--line)] p-px">
           <div className="overflow-x-auto pb-2">
             <div
-              className="grid w-max gap-px bg-[color:var(--line)]"
+              className="grid min-w-max w-full gap-px bg-[color:var(--line)]"
               data-testid="quote-grid"
               style={{
-                gridTemplateColumns: `repeat(${normalized.cols}, minmax(var(--board-grid-cell-size), var(--board-grid-cell-size)))`,
+                gridTemplateColumns: buildResponsiveGridTemplateColumns(normalized.cols),
               }}
             >
               {normalized.grid.map((cell) => {
@@ -520,10 +525,10 @@ export function AcrosticBoard({
         <div className="mt-3 overflow-hidden rounded-[1.2rem] border border-[color:var(--line)] bg-[color:var(--line)] p-px">
           <div className="overflow-x-auto pb-2">
             <div
-              className="grid w-max gap-px bg-[color:var(--line)]"
+              className="grid min-w-max w-full gap-px bg-[color:var(--line)]"
               data-testid="title-grid"
               style={{
-                gridTemplateColumns: `repeat(${titleCellCount}, minmax(var(--board-grid-cell-size), var(--board-grid-cell-size)))`,
+                gridTemplateColumns: buildResponsiveGridTemplateColumns(titleCellCount),
               }}
             >
               {normalized.titleCells.map((cell) => {
